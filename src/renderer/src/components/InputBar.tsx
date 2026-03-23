@@ -3,14 +3,11 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { MicrophoneIcon, ArrowUpIcon, SpinnerGapIcon, XIcon } from '@phosphor-icons/react'
 import { resolveProviderContext, useSessionStore } from '../stores/sessionStore'
 import { AttachmentChips } from './AttachmentChips'
-import {
-  SlashCommandMenu,
-  getFilteredCommandsWithExtras,
-  type SlashCommand
-} from './SlashCommandMenu'
+import { SlashCommandMenu } from './SlashCommandMenu'
 import { AVAILABLE_MODELS } from '../lib/llm'
 import { useColors } from '../lib/theme'
 import { useRealtimeVoice } from '../hooks/useRealtimeVoice'
+import { getFilteredCommandsWithExtras, type SlashCommand } from '../lib/slash-commands'
 
 const INPUT_MIN_HEIGHT = 20
 const INPUT_MAX_HEIGHT = 140
@@ -160,7 +157,7 @@ export function InputBar() {
     const inlineWidth = Math.max(120, hostWidth - INLINE_CONTROLS_RESERVED_WIDTH)
     Object.assign(measure.style, {
       width: `${inlineWidth}px`,
-      fontSize: '14px',
+      fontSize: '13.5px',
       lineHeight: '20px',
       paddingTop: '15px',
       paddingBottom: '15px',
@@ -274,13 +271,7 @@ export function InputBar() {
           break
         case '/help':
           addSystemMessage(
-            [
-              '/clear — Clear conversation',
-              '/cost — Show token usage',
-              '/skills — Show installed skills',
-              '/model — Show / switch model',
-              '/help — This list'
-            ].join('\n')
+            BASE_COMMANDS.map((command) => `${command.command} — ${command.description}`).join('\n')
           )
           break
       }
@@ -328,9 +319,12 @@ export function InputBar() {
       )
       setInput('')
       setSlashFilter(null)
-      match
-        ? (setPreferredModel(match.id), addSystemMessage(`Model switched to ${match.label}`))
-        : addSystemMessage(`Unknown model "${modelMatch[1]}".`)
+      if (match) {
+        setPreferredModel(match.id)
+        addSystemMessage(`Model switched to ${match.label}`)
+      } else {
+        addSystemMessage(`Unknown model "${modelMatch[1]}".`)
+      }
       return
     }
     if (orchestratorMatch) {

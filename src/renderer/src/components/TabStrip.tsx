@@ -51,9 +51,8 @@ export function TabStrip() {
     >
       <div className="relative min-w-0 flex-1 overflow-hidden">
         <div
-          className="flex items-center gap-0.5 overflow-x-auto"
+          className="flex items-center gap-0.5 overflow-x-auto hide-scrollbar"
           style={{
-            scrollbarWidth: 'none',
             paddingRight: 8,
             maskImage:
               'linear-gradient(to right, black 0%, black calc(100% - 24px), transparent 100%)',
@@ -125,6 +124,7 @@ export function TabStrip() {
 
                   {tabs.length > 1 && (
                     <button
+                      aria-label={`Close ${tab.title || 'tab'}`}
                       onClick={(e) => {
                         e.stopPropagation()
                         closeTab(tab.id)
@@ -145,7 +145,17 @@ export function TabStrip() {
                         ;(e.currentTarget as HTMLElement).style.background =
                           'rgba(255,255,255,0.12)'
                       }}
+                      onFocus={(e) => {
+                        ;(e.currentTarget as HTMLElement).style.opacity = '1'
+                        ;(e.currentTarget as HTMLElement).style.background =
+                          'rgba(255,255,255,0.12)'
+                      }}
                       onMouseLeave={(e) => {
+                        ;(e.currentTarget as HTMLElement).style.opacity = isActive ? '0.3' : '0'
+                        ;(e.currentTarget as HTMLElement).style.background =
+                          'rgba(255,255,255,0.07)'
+                      }}
+                      onBlur={(e) => {
                         ;(e.currentTarget as HTMLElement).style.opacity = isActive ? '0.3' : '0'
                         ;(e.currentTarget as HTMLElement).style.background =
                           'rgba(255,255,255,0.07)'
@@ -177,16 +187,19 @@ export function TabStrip() {
 function TabIconBtn({
   children,
   title,
+  ariaLabel,
   onClick
 }: {
   children: React.ReactNode
   title: string
+  ariaLabel?: string
   onClick: () => void
 }) {
   const colors = useColors()
   return (
     <button
       onClick={onClick}
+      aria-label={ariaLabel || title}
       title={title}
       className="flex-shrink-0 flex items-center justify-center rounded-full"
       style={{
@@ -202,7 +215,15 @@ function TabIconBtn({
         ;(e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.07)'
         ;(e.currentTarget as HTMLElement).style.color = colors.textSecondary
       }}
+      onFocus={(e) => {
+        ;(e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.07)'
+        ;(e.currentTarget as HTMLElement).style.color = colors.textSecondary
+      }}
       onMouseLeave={(e) => {
+        ;(e.currentTarget as HTMLElement).style.background = 'transparent'
+        ;(e.currentTarget as HTMLElement).style.color = colors.textTertiary
+      }}
+      onBlur={(e) => {
         ;(e.currentTarget as HTMLElement).style.background = 'transparent'
         ;(e.currentTarget as HTMLElement).style.color = colors.textTertiary
       }}

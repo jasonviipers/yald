@@ -5,13 +5,29 @@ import { join } from 'path'
 import { log as _log } from './logger'
 import { SandboxManager } from './sandbox'
 import { BrowserAgentManager } from './browser-agent'
+import { classifyDiagnosticEntries } from './vibe-pipeline-diagnostics'
 import { installSkill, listInstalledSkills, buildInstalledSkillsSystemPrompt } from './skills/store'
+import {
+  ENGINEER_LAYER_ORDER,
+  MAX_SELF_HEAL_ATTEMPTS,
+  PIPELINE_STAGE_LABELS,
+  type BrainstormBrief,
+  type BrowserReviewResult,
+  type ChatPayload,
+  type DiagnosticEntry,
+  type DiagnosticReport,
+  type EngineerFile,
+  type EngineerManifest,
+  type QAResult,
+  type SelectorPlan,
+  type SkillForgeResult,
+  type SkillInventoryEntry,
+  type StageId
+} from './vibe-pipeline-types'
 import { DEFAULT_BACKEND_URL, resolveBackendUrl } from '../shared/backend-url'
 import type { PipelineStage, ProviderContext, VibePipelineState } from '../shared/types'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-
-type StageId = PipelineStage['id']
 
 interface PipelineRun {
   tabId: string
@@ -23,140 +39,7 @@ interface PipelineRun {
   diagnosticLog: DiagnosticEntry[]
 }
 
-interface DiagnosticEntry {
-  ts: number
-  stage: StageId | 'init'
-  level: 'info' | 'warn' | 'error'
-  source: 'stdout' | 'stderr' | 'pipeline' | 'build' | 'runtime'
-  message: string
-}
-
-interface SkillInventoryEntry {
-  id: string
-  name: string
-  description: string
-}
-
-interface BrainstormBrief {
-  problem: string
-  mvp_features: string[]
-  out_of_scope: string[]
-  stack: { frontend: string; backend: string; db: string; rationale: string }
-  data_model: Array<{ entity: string; fields: string[]; relations: string[] }>
-  ux_flow: string[]
-  file_architecture: string[]
-  risks: string[]
-  confidence: number
-}
-
-interface SkillForgeResult {
-  name: string
-  content: string
-  covers: string[]
-}
-
-interface EngineerFile {
-  path: string
-  content: string
-  layer: 'types' | 'constants' | 'utils' | 'data' | 'logic' | 'api' | 'ui' | 'entry' | 'config'
-}
-
-interface EngineerManifest {
-  installCommand: string
-  buildCommand: string
-  startCommand: string
-  entryPoint: string
-  envVars: Array<{ key: string; description: string; required: boolean }>
-  fileTree: string[]
-  files: EngineerFile[]
-}
-
-interface BrowserReviewResult {
-  initial_screenshot: string
-  ux_flow_results: Array<{
-    step: string
-    status: 'pass' | 'fail'
-    screenshot: string
-    notes: string
-  }>
-  console_errors: string[]
-  console_warnings: string[]
-  edge_case_results: Array<{ case: string; status: 'pass' | 'fail'; notes: string }>
-  overall_status: 'pass' | 'fail' | 'partial'
-  review_complete: true
-}
-
-interface QAResult {
-  status: 'pass' | 'fail' | 'partial'
-  passing_features: string[]
-  failing_features: Array<{ feature: string; root_cause: string }>
-  console_errors: Array<{ message: string; severity: 'low' | 'medium' | 'high' }>
-  edge_case_results: Array<{ case: string; status: 'pass' | 'fail'; notes: string }>
-  recommendation: 'ship' | 'fix then ship' | 'needs redesign'
-  delivery_summary: string
-}
-
-interface SelectorPlan {
-  selector: string
-  action: 'click' | 'type' | 'noop'
-  text?: string
-}
-
-interface ChatPayload {
-  message?: { content?: string }
-  error?: { message?: string }
-}
-
-/**
- * Structured failure analysis produced by the self-diagnostic engine.
- * The engineer fix loop uses this to generate targeted patches instead of
- * blindly replaying the entire manifest at the model.
- */
-interface DiagnosticReport {
-  category:
-    | 'missing_dependency'
-    | 'missing_file'
-    | 'type_error'
-    | 'syntax_error'
-    | 'runtime_crash'
-    | 'port_not_exposed'
-    | 'unknown'
-  affectedFiles: string[]
-  missingPackages: string[]
-  errorMessages: string[]
-  /** Condensed context sent to the fix-generating prompt */
-  fixContext: string
-}
-
 // ─── Constants ────────────────────────────────────────────────────────────────
-
-const PIPELINE_STAGE_LABELS: Record<StageId, string> = {
-  skill_inventory_check: 'Skill Inventory',
-  brainstorm: 'Brainstorm',
-  skill_forge: 'Skill Forge',
-  engineer: 'Engineer',
-  sandbox: 'Sandbox',
-  browser: 'Browser Review',
-  qa: 'QA Synthesis'
-}
-
-const ENGINEER_LAYER_ORDER: EngineerFile['layer'][] = [
-  'types',
-  'constants',
-  'utils',
-  'data',
-  'logic',
-  'api',
-  'ui',
-  'entry',
-  'config'
-]
-
-/** Maximum number of self-heal iterations before we give up and surface the error. */
-const MAX_SELF_HEAL_ATTEMPTS = 5
-
-/** How many recent diagnostic log lines to include in a fix context. */
-const DIAGNOSTIC_TAIL_LINES = 60
 
 // ─── Logging ──────────────────────────────────────────────────────────────────
 
@@ -361,117 +244,6 @@ async function requestChat(
 //
 // This replaces the previous approach of passing raw stderr text directly to the
 // model — which wasted context and led to unfocused fixes.
-
-const MISSING_DEP_PATTERNS: RegExp[] = [
-  /Cannot find module ['"]([^'"]+)['"]/,
-  /Module not found.*['"]([^'"]+)['"]/,
-  /Cannot resolve.*['"]([^'"]+)['"]/,
-  /Error: Cannot find package '([^']+)'/,
-  /npm ERR! 404.*'([^']+)'/,
-  /Could not resolve ['"]([^'"]+)['"]/,
-  /Package subpath '([^']+)' is not defined/
-]
-
-const MISSING_FILE_PATTERNS: RegExp[] = [
-  /ENOENT.*no such file.*'([^']+)'/i,
-  /Cannot find.*file.*['"]([^'"]+)['"]/i,
-  /Failed to resolve import.*['"]([^'"]+)['"]/i
-]
-
-const TYPE_ERROR_PATTERNS: RegExp[] = [
-  /TS\d{4}:/,
-  /Type '.*' is not assignable/,
-  /Property '.*' does not exist on type/,
-  /Argument of type '.*' is not assignable/
-]
-
-const SYNTAX_ERROR_PATTERNS: RegExp[] = [
-  /SyntaxError:/,
-  /Unexpected token/,
-  /Unexpected end of/,
-  /Expected.*but found/,
-  /Parsing error:/
-]
-
-function classifyDiagnosticEntries(entries: DiagnosticEntry[]): DiagnosticReport {
-  const errorLines = entries
-    .filter((e) => e.level === 'error' || e.source === 'stderr')
-    .map((e) => e.message)
-
-  const allLines = entries.map((e) => e.message)
-
-  const missingPackages: string[] = []
-  const affectedFiles: string[] = []
-  const errorMessages: string[] = []
-
-  for (const line of errorLines) {
-    // Missing dependency detection
-    for (const pattern of MISSING_DEP_PATTERNS) {
-      const match = pattern.exec(line)
-      if (match) {
-        const pkg = match[1]
-        // Only include external packages (not relative imports)
-        if (!pkg.startsWith('.') && !pkg.startsWith('/')) {
-          missingPackages.push(pkg.split('/')[0]) // strip sub-paths e.g. pkg/foo → pkg
-        }
-      }
-    }
-
-    // Missing file detection
-    for (const pattern of MISSING_FILE_PATTERNS) {
-      const match = pattern.exec(line)
-      if (match) {
-        affectedFiles.push(match[1])
-      }
-    }
-
-    if (line.trim()) errorMessages.push(line.trim())
-  }
-
-  // Determine category
-  let category: DiagnosticReport['category'] = 'unknown'
-  const combined = errorLines.join('\n')
-
-  if (missingPackages.length > 0) {
-    category = 'missing_dependency'
-  } else if (affectedFiles.length > 0) {
-    category = 'missing_file'
-  } else if (TYPE_ERROR_PATTERNS.some((p) => p.test(combined))) {
-    category = 'type_error'
-  } else if (SYNTAX_ERROR_PATTERNS.some((p) => p.test(combined))) {
-    category = 'syntax_error'
-  } else if (allLines.some((l) => /port|EADDRINUSE|listen/i.test(l))) {
-    category = 'port_not_exposed'
-  } else if (errorLines.some((l) => /crash|uncaught|unhandled|fatal/i.test(l))) {
-    category = 'runtime_crash'
-  }
-
-  // Build a compact fixContext — tail of recent diagnostic lines + structured summary
-  const tail = entries
-    .slice(-DIAGNOSTIC_TAIL_LINES)
-    .map((e) => `[${e.source}][${e.level}] ${e.message}`)
-    .join('\n')
-
-  const fixContext = [
-    `FAILURE CATEGORY: ${category}`,
-    missingPackages.length > 0
-      ? `MISSING PACKAGES: ${uniqueStrings(missingPackages).join(', ')}`
-      : '',
-    affectedFiles.length > 0 ? `AFFECTED FILES: ${uniqueStrings(affectedFiles).join(', ')}` : '',
-    `KEY ERRORS:\n${errorMessages.slice(0, 15).join('\n')}`,
-    `\nRECENT LOG TAIL:\n${tail}`
-  ]
-    .filter(Boolean)
-    .join('\n\n')
-
-  return {
-    category,
-    affectedFiles: uniqueStrings(affectedFiles),
-    missingPackages: uniqueStrings(missingPackages),
-    errorMessages: uniqueStrings(errorMessages).slice(0, 15),
-    fixContext
-  }
-}
 
 // ─── Layer inference ──────────────────────────────────────────────────────────
 
@@ -2312,13 +2084,63 @@ export class VibePipelineManager extends EventEmitter {
       2
     )
 
+    // Build category-aware fix instructions so the model gets precise guidance
+    // rather than generic "fix the error" instructions.
+    const categoryInstructions: string[] = (() => {
+      switch (report.category) {
+        case 'type_error': {
+          const isJsx = report.errorMessages.some((m) =>
+            /construct or call signatures|JSX element type/i.test(m)
+          )
+          if (isJsx) {
+            return [
+              'CRITICAL: One or more React components are not valid JSX element types.',
+              'For EVERY component file listed in affectedFiles (and any component it imports):',
+              '  1. Ensure it exports a standard React functional component — either:',
+              '       export default function MyComponent(): JSX.Element { ... }',
+              '       export const MyComponent = (): JSX.Element => ...',
+              '  2. Do NOT export a class, plain object, async function, or non-function value as a component.',
+              '  3. Verify the import at the call site matches the export style (default vs named).',
+              '  4. If a component uses React.FC<Props>, ensure it is assigned to a const, not a class.',
+              'Rewrite the full component file(s) with correct functional component syntax.'
+            ]
+          }
+          return [
+            'Fix the TypeScript type errors listed in the diagnostic report.',
+            'Correct type annotations, ensure values match their declared types, and resolve any import/export mismatches.'
+          ]
+        }
+        case 'syntax_error':
+          return [
+            'Fix the syntax errors listed in the diagnostic report.',
+            'Check for unclosed braces/brackets, missing commas, invalid JSX structure, or stray characters.',
+            'Rewrite the affected file(s) with correct syntax.'
+          ]
+        case 'missing_file':
+          return [
+            'Create the missing file(s) listed in affectedFiles, or correct the import paths that reference them.',
+            'If creating a new component, export it as a proper React functional component.'
+          ]
+        case 'missing_dependency':
+          return [
+            'Add the missing packages to package.json under dependencies or devDependencies.',
+            'Use "latest" as the version if the exact version is unknown.'
+          ]
+        default:
+          return [
+            'Fix the build or runtime failure described in the diagnostic report.',
+            'Make the minimum changes required — do not rewrite unrelated files.'
+          ]
+      }
+    })()
+
     const systemPrompt = [
       skillsSystemPrompt ? skillsSystemPrompt + '\n\n---\n' : '',
       'You are the Engineer Agent performing a targeted self-heal fix.',
-      'A build or runtime failure has been diagnosed. You are given a structured diagnostic report.',
-      'Return ONLY the files that need to change to resolve the reported failure.',
-      'Focus the fix on the specific failure category — do not rewrite unrelated files.',
-      'Each file must have "path" (string), "content" (complete corrected file source), and',
+      'A build failure has been diagnosed. You are given a structured diagnostic report with the exact error, file, and line number.',
+      ...categoryInstructions,
+      'Return ONLY the files that need to change.',
+      'Each file must have "path" (string), "content" (COMPLETE corrected file source — not a partial snippet), and',
       `"layer" (one of: ${ENGINEER_LAYER_ORDER.join(', ')}).`,
       'Return a JSON object with a "files" array. No explanation, no markdown fences.'
     ]

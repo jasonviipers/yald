@@ -108,14 +108,14 @@ function ModelPicker() {
               style={{
                 padding: '4px',
                 maxHeight: 240,
-                overflowY: 'auto',
-                scrollbarWidth: 'none'
+                overflowY: 'auto'
               }}
+              className="hide-scrollbar"
             >
               {AVAILABLE_MODELS.map((model) => {
-                const isSelected =
-                  preferredModel === model.id ||
-                  (!preferredModel && model.id === AVAILABLE_MODELS[0]?.id)
+                const selectedModelId =
+                  preferredModel || tab?.sessionModel || AVAILABLE_MODELS[0]?.id
+                const isSelected = selectedModelId === model.id
                 return (
                   <button
                     key={model.id}

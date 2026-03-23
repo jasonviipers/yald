@@ -10,6 +10,7 @@ import type { PipelineStage } from '@shared/types'
 const STAGE_ORDER: PipelineStage['id'][] = [
   'skill_inventory_check',
   'brainstorm',
+  'skill_forge',
   'engineer',
   'sandbox',
   'browser',
@@ -172,7 +173,13 @@ export function PipelineStatus(): ReactElement | null {
         }}
       >
         {/* Stage grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, minmax(0, 1fr))', gap: 6 }}>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: `repeat(${STAGE_ORDER.length}, minmax(0, 1fr))`,
+            gap: 6
+          }}
+        >
           {STAGE_ORDER.map((stageId) => {
             const stage = pipelineState.stages.find((item) => item.id === stageId)
             const isRunning = stage?.status === 'running'

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react'
+import React, { useState, useRef, useEffect, useCallback, useId } from 'react'
 import { createPortal } from 'react-dom'
 import { motion } from 'framer-motion'
 import { DotsThree, Bell, ArrowsOutSimple, Moon, HeadCircuit } from '@phosphor-icons/react'
@@ -165,7 +165,7 @@ function SettingInput({
 
 // ─── SectionLabel ─────────────────────────────────────────────────────────────
 
-function SectionLabel({ children }: { children: React.ReactNode }) {
+function SectionLabel({ children }: { children: React.ReactNode }): React.ReactElement {
   const colors = useColors()
   return (
     <div
@@ -197,6 +197,7 @@ export function SettingsPopover() {
   const closeSettings = useSessionStore((s) => s.closeSettings)
   const popoverLayer = usePopoverLayer()
   const colors = useColors()
+  const settingsPopoverId = useId()
   const triggerRef = useRef<HTMLButtonElement>(null)
   const popoverRef = useRef<HTMLDivElement>(null)
   const [pos, setPos] = useState<{ right: number; top?: number; bottom?: number }>({ right: 0 })
@@ -241,6 +242,8 @@ export function SettingsPopover() {
     <>
       <button
         ref={triggerRef}
+        aria-expanded={open}
+        aria-controls={settingsPopoverId}
         onClick={() => {
           if (!open) updatePos()
           toggleSettingsOpen()
@@ -272,6 +275,7 @@ export function SettingsPopover() {
         open &&
         createPortal(
           <motion.div
+            id={settingsPopoverId}
             ref={popoverRef}
             data-yald-ui
             initial={{ opacity: 0, y: isExpanded ? -5 : 5, scale: 0.96 }}

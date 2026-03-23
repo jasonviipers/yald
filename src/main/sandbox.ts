@@ -94,9 +94,10 @@ function createSandboxEnv(workdir: string, extraEnv?: Record<string, string>): N
     if (typeof value === 'string' && value) baseEnv[key] = value
   }
 
-  // Always provide HOME — required by npm, bun, node
-  if (!baseEnv.HOME && !baseEnv.USERPROFILE) {
-    baseEnv.HOME = homedir()
+  // Always provide HOME — required by npm, bun, node.
+  // On Windows we often only get USERPROFILE from the parent environment.
+  if (!baseEnv.HOME) {
+    baseEnv.HOME = baseEnv.USERPROFILE || homedir()
   }
 
   // Point Node module resolution exclusively at the sandbox's own node_modules.
@@ -116,6 +117,16 @@ function createSandboxEnv(workdir: string, extraEnv?: Record<string, string>): N
   }
 
   return baseEnv
+}
+
+function createSandboxSlug(projectName: string | undefined, id: string): string {
+  const normalized = (projectName || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 40)
+  const base = normalized || id.slice(0, 8)
+  return `${base}-${id.slice(0, 8)}`
 }
 
 function pushLogLine(sandbox: InternalSandbox, line: string): void {
@@ -249,15 +260,9 @@ export class SandboxManager extends EventEmitter {
 
   async create(projectName?: string): Promise<SandboxHandle> {
     const id = crypto.randomUUID()
-    // Use a permanent directory under the user's home so projects survive
-    // after the pipeline completes and are not affected by temp-dir cleanup.
-    const slug = projectName
-      ? projectName
-          .toLowerCase()
-          .replace(/[^a-z0-9]+/g, '-')
-          .replace(/^-+|-+$/g, '')
-          .slice(0, 40)
-      : id.slice(0, 8)
+    // Use a unique directory per sandbox so destroy() only ever targets
+    // the specific workdir for this id, even when projectName normalizes poorly.
+    const slug = createSandboxSlug(projectName, id)
     const workdir = join(homedir(), 'yald-projects', slug)
     await mkdir(workdir, { recursive: true })
 
@@ -293,12 +298,15 @@ export class SandboxManager extends EventEmitter {
     const startedAt = Date.now()
     const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS
     const shell = shellCommandForPlatform(command)
+    const detached = process.platform !== 'win32'
 
     const child = spawn(shell.file, shell.args, {
       cwd: sandbox.handle.workdir,
       env: createSandboxEnv(sandbox.handle.workdir, options.env),
-      stdio: 'pipe'
+      stdio: 'pipe',
+      detached
     })
+    if (detached) child.unref()
 
     sandbox.process = child
     pushLogLine(sandbox, `$ ${command}`)
@@ -570,10 +578,20 @@ export class SandboxManager extends EventEmitter {
       // Wait for the close event to confirm the process is gone
       await Promise.race([new Promise<void>((resolve) => child.once('close', resolve)), wait(3000)])
     } else {
-      child.kill('SIGTERM')
+      const pid = child.pid
+      if (typeof pid !== 'number') return
+      try {
+        process.kill(-pid, 'SIGTERM')
+      } catch {
+        // Process group may already be gone.
+      }
       await Promise.race([new Promise<void>((resolve) => child.once('close', resolve)), wait(2000)])
       if (!child.killed && child.exitCode === null) {
-        child.kill('SIGKILL')
+        try {
+          process.kill(-pid, 'SIGKILL')
+        } catch {
+          // Process group may already be gone.
+        }
       }
     }
   }

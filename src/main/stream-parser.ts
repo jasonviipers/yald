@@ -17,16 +17,6 @@ export interface StreamParserEvents {
   'line-overflow': (byteLength: number) => void
 }
 
-// Typed EventEmitter — callers get autocomplete and type-safe listeners
-export declare interface StreamParser {
-  on<K extends keyof StreamParserEvents>(event: K, listener: StreamParserEvents[K]): this
-  once<K extends keyof StreamParserEvents>(event: K, listener: StreamParserEvents[K]): this
-  emit<K extends keyof StreamParserEvents>(
-    event: K,
-    ...args: Parameters<StreamParserEvents[K]>
-  ): boolean
-}
-
 export class StreamParser extends EventEmitter {
   private buffer = ''
   private byteLength = 0
@@ -38,6 +28,24 @@ export class StreamParser extends EventEmitter {
     return { lineCount: this.lineCount, errorCount: this.errorCount, byteLength: this.byteLength }
   }
 
+  on<K extends keyof StreamParserEvents>(event: K, listener: StreamParserEvents[K]): this
+  on(event: string | symbol, listener: (...args: unknown[]) => void): this {
+    return super.on(event, listener)
+  }
+
+  once<K extends keyof StreamParserEvents>(event: K, listener: StreamParserEvents[K]): this
+  once(event: string | symbol, listener: (...args: unknown[]) => void): this {
+    return super.once(event, listener)
+  }
+
+  emit<K extends keyof StreamParserEvents>(
+    event: K,
+    ...args: Parameters<StreamParserEvents[K]>
+  ): boolean
+  emit(event: string | symbol, ...args: unknown[]): boolean {
+    return super.emit(event, ...args)
+  }
+
   /**
    * Feed a chunk of stdout data into the parser.
    * Emits 'event' for each valid JSON line, 'parse-error' for unparseable lines.
@@ -46,17 +54,19 @@ export class StreamParser extends EventEmitter {
   feed(chunk: string): void {
     if (this.overflowed) return
 
-    this.byteLength += Buffer.byteLength(chunk, 'utf8')
+    const nextBuffer = this.buffer + chunk
+    const nextByteLength = Buffer.byteLength(nextBuffer, 'utf8')
 
-    if (this.byteLength > MAX_BUFFER_BYTES) {
+    if (nextByteLength > MAX_BUFFER_BYTES) {
       this.overflowed = true
+      this.byteLength = nextByteLength
       log(`buffer overflow at ${this.byteLength} bytes — stream marked corrupt`)
       this.emit('buffer-overflow', this.byteLength)
-      this.reset()
       return
     }
 
-    this.buffer += chunk
+    this.buffer = nextBuffer
+    this.byteLength = nextByteLength
     this.drainLines()
   }
 
@@ -79,6 +89,8 @@ export class StreamParser extends EventEmitter {
   reset(): void {
     this.buffer = ''
     this.byteLength = 0
+    this.lineCount = 0
+    this.errorCount = 0
     this.overflowed = false
   }
 
@@ -116,6 +128,7 @@ export class StreamParser extends EventEmitter {
       // Slice without including the newline character
       const raw = this.buffer.slice(0, newlineIndex)
       this.buffer = this.buffer.slice(newlineIndex + 1)
+      this.byteLength = Buffer.byteLength(this.buffer, 'utf8')
 
       const line = raw.trimEnd()
       if (line.length > 0) {

@@ -125,7 +125,7 @@ export function ConversationView() {
     <div data-yald-ui>
       <div
         ref={scrollRef}
-        className="overflow-y-auto overflow-x-hidden conversation-selectable"
+        className="overflow-y-auto overflow-x-hidden conversation-selectable hide-scrollbar"
         style={{ maxHeight: expandedUI ? 460 : 336, padding: '10px 14px 28px' }}
         onScroll={handleScroll}
       >
@@ -374,7 +374,7 @@ function CopyButton({ text }: { text: string }) {
 
 // ─── Interrupt Button ─────────────────────────────────────────────────────────
 
-function InterruptButton({ tabId }: { tabId: string }) {
+function InterruptButton({ tabId }: { tabId: string }): React.ReactElement {
   const colors = useColors()
   return (
     <motion.button
@@ -411,7 +411,13 @@ function InterruptButton({ tabId }: { tabId: string }) {
 
 // ─── User Message ─────────────────────────────────────────────────────────────
 
-function UserMessage({ message, skipMotion }: { message: Message; skipMotion?: boolean }) {
+function UserMessage({
+  message,
+  skipMotion
+}: {
+  message: Message
+  skipMotion?: boolean
+}): React.ReactElement {
   const colors = useColors()
   const content = (
     <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '3px 0' }}>
@@ -448,7 +454,7 @@ function UserMessage({ message, skipMotion }: { message: Message; skipMotion?: b
 
 // ─── Queued Message ───────────────────────────────────────────────────────────
 
-function QueuedMessage({ content }: { content: string }) {
+function QueuedMessage({ content }: { content: string }): React.ReactElement {
   const colors = useColors()
   return (
     <motion.div
@@ -516,7 +522,8 @@ function TableScrollWrapper({ children }: { children: React.ReactNode }) {
     <div
       ref={ref}
       onScroll={update}
-      style={{ overflowX: 'auto', scrollbarWidth: 'none', maskImage: fade, WebkitMaskImage: fade }}
+      className="hide-scrollbar"
+      style={{ overflowX: 'auto', maskImage: fade, WebkitMaskImage: fade }}
     >
       <table>{children}</table>
     </div>
@@ -876,7 +883,13 @@ function ToolGroup({ tools, skipMotion }: { tools: Message[]; skipMotion?: boole
 
 // ─── System Message ───────────────────────────────────────────────────────────
 
-function SystemMessage({ message, skipMotion }: { message: Message; skipMotion?: boolean }) {
+function SystemMessage({
+  message,
+  skipMotion
+}: {
+  message: Message
+  skipMotion?: boolean
+}): React.ReactElement {
   const isError = message.content.startsWith('Error:') || message.content.includes('unexpectedly')
   const colors = useColors()
   const inner = (
@@ -908,7 +921,7 @@ function SystemMessage({ message, skipMotion }: { message: Message; skipMotion?:
 
 // ─── Tool Icon ────────────────────────────────────────────────────────────────
 
-function ToolIcon({ name, size = 11 }: { name: string; size?: number }) {
+function ToolIcon({ name, size = 11 }: { name: string; size?: number }): React.ReactElement {
   const colors = useColors()
   const ICONS: Record<string, React.ReactNode> = {
     LS: <FolderOpenIcon size={size} />,

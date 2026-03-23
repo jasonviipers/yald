@@ -28,7 +28,7 @@ export function AttachmentChips({
   if (attachments.length === 0) return null
 
   return (
-    <div className="flex gap-1.5 pb-1" style={{ overflowX: 'auto', scrollbarWidth: 'none' }}>
+    <div className="flex gap-1.5 pb-1 hide-scrollbar" style={{ overflowX: 'auto' }}>
       <AnimatePresence mode="popLayout">
         {attachments.map((a) => (
           <motion.div
@@ -70,8 +70,9 @@ export function AttachmentChips({
             </span>
 
             <button
+              aria-label={`Remove ${a.name}`}
               onClick={() => onRemove(a.id)}
-              className="flex-shrink-0 flex items-center justify-center rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+              className="flex-shrink-0 flex items-center justify-center rounded-full opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity"
               style={{
                 width: 13,
                 height: 13,

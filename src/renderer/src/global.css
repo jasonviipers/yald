@@ -28,15 +28,15 @@ body,
   letter-spacing: -0.01em;
 }
 
-/* ─── Scrollbar — fully hidden, still scrollable ─── */
-::-webkit-scrollbar {
-  width: 0px;
-  height: 0px;
-  display: none;
-}
-* {
+/* ─── Scrollbar — opt-in hidden utility ─── */
+.hide-scrollbar {
   scrollbar-width: none;
   -ms-overflow-style: none;
+}
+.hide-scrollbar::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
 }
 
 /* ─── Textarea reset ─── */
@@ -77,10 +77,8 @@ input::placeholder {
   background: var(--yald-container-bg);
   backdrop-filter: blur(32px) saturate(180%) brightness(1.03);
   -webkit-backdrop-filter: blur(32px) saturate(180%) brightness(1.03);
-
   border: 1px solid transparent;
   background-clip: padding-box;
-
   box-shadow:
     /* Top highlight — cooler, less saturated */
     0 1px 0 0 rgba(255, 255, 255, 0.48) inset,
@@ -90,7 +88,6 @@ input::placeholder {
     /* Outer: deeper, cleaner shadow */ 0 12px 40px rgba(0, 0, 0, 0.32),
     0 3px 10px rgba(0, 0, 0, 0.2),
     /* Subtle inner glow — barely noticeable */ 0 0 0 0.5px rgba(160, 150, 200, 0.08) inset;
-
   border-radius: 18px;
   overflow: hidden;
   isolation: isolate;
@@ -295,7 +292,6 @@ input::placeholder {
   color: var(--yald-text-primary);
   line-height: 1.65;
   overflow-wrap: break-word;
-  word-break: break-word;
   font-size: 13.5px;
 }
 .prose-cloud p {

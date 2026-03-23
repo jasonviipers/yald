@@ -1,42 +1,9 @@
-import React, { useEffect, useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { motion } from 'framer-motion'
-import {
-  SparkleIcon,
-  CurrencyDollarIcon,
-  TrashIcon,
-  CpuIcon,
-  QuestionIcon
-} from '@phosphor-icons/react'
 import { usePopoverLayer } from './PopoverLayer'
 import { useColors } from '../lib/theme'
-
-export interface SlashCommand {
-  command: string
-  description: string
-  icon: React.ReactNode
-}
-
-export const SLASH_COMMANDS: SlashCommand[] = [
-  { command: '/clear', description: 'Clear conversation', icon: <TrashIcon size={11} /> },
-  { command: '/cost', description: 'Show usage & cost', icon: <CurrencyDollarIcon size={11} /> },
-  { command: '/skills', description: 'Available skills', icon: <SparkleIcon size={11} /> },
-  { command: '/model', description: 'Switch model', icon: <CpuIcon size={11} /> },
-  { command: '/help', description: 'Show all commands', icon: <QuestionIcon size={11} /> }
-]
-
-export function getFilteredCommands(f: string) {
-  return getFilteredCommandsWithExtras(f, [])
-}
-
-export function getFilteredCommandsWithExtras(f: string, extra: SlashCommand[]): SlashCommand[] {
-  const q = f.toLowerCase()
-  const merged = [...SLASH_COMMANDS]
-  for (const cmd of extra) {
-    if (!merged.some((c) => c.command === cmd.command)) merged.push(cmd)
-  }
-  return merged.filter((c) => c.command.startsWith(q))
-}
+import { getFilteredCommandsWithExtras, type SlashCommand } from '../lib/slash-commands'
 
 export function SlashCommandMenu({
   filter,
@@ -99,7 +66,11 @@ export function SlashCommandMenu({
         Commands
       </div>
 
-      <div ref={listRef} style={{ padding: '4px', maxHeight: 200, overflowY: 'auto' }}>
+      <div
+        ref={listRef}
+        className="hide-scrollbar"
+        style={{ padding: '4px', maxHeight: 200, overflowY: 'auto' }}
+      >
         {filtered.map((cmd, i) => {
           const isSel = i === selectedIndex
           return (

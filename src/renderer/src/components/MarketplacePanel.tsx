@@ -52,7 +52,8 @@ export function MarketplacePanel() {
     try {
       await uninstallSkill(skillId)
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err) || 'Removal failed')
+      const message = err instanceof Error ? err.message || String(err) : String(err)
+      setError(message && message.trim() ? message : 'Removal failed')
     } finally {
       setBusySkillId(null)
     }
@@ -63,7 +64,8 @@ export function MarketplacePanel() {
     try {
       await refreshInstalledSkills()
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err) || 'Refresh failed')
+      const message = err instanceof Error ? err.message || String(err) : String(err)
+      setError(message && message.trim() ? message : 'Refresh failed')
     }
   }
 
@@ -254,6 +256,7 @@ function PanelIconBtn({
   return (
     <button
       onClick={onClick}
+      aria-label={title}
       title={title}
       style={{
         background: 'none',
