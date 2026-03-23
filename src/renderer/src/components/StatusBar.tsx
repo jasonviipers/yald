@@ -133,6 +133,13 @@ function compactPath(fullPath: string): string {
 
 export function StatusBar() {
   const tab = useSessionStore((state) => state.tabs.find((item) => item.id === state.activeTabId))
+  const orchestratorEnabled = useSessionStore(
+    (state) => state.orchestratorEnabledByTab[state.activeTabId] ?? true
+  )
+  const orchestratorContext = useSessionStore(
+    (state) => state.orchestratorContextByTab[state.activeTabId] || null
+  )
+  const toggleOrchestratorMode = useSessionStore((state) => state.toggleOrchestratorMode)
   const colors = useColors()
 
   if (!tab) return null
@@ -152,6 +159,28 @@ export function StatusBar() {
         </span>
         <span style={{ color: colors.textMuted, fontSize: 10 }}>|</span>
         <ModelPicker />
+        <span style={{ color: colors.textMuted, fontSize: 10 }}>|</span>
+        <button
+          onClick={toggleOrchestratorMode}
+          className="flex items-center gap-1 rounded-full px-1.5 py-0.5 transition-colors"
+          style={{
+            color: orchestratorEnabled ? colors.textPrimary : colors.textTertiary,
+            border: `1px solid ${colors.popoverBorder}`,
+            background: orchestratorEnabled ? 'rgba(255,255,255,0.06)' : 'transparent'
+          }}
+          title={
+            orchestratorContext
+              ? `Orchestrator ${orchestratorEnabled ? 'enabled' : 'disabled'} · ${orchestratorContext.intent} · confidence ${orchestratorContext.confidence}`
+              : `Orchestrator ${orchestratorEnabled ? 'enabled' : 'disabled'}`
+          }
+        >
+          <span>Orchestrator</span>
+          {orchestratorContext && (
+            <span style={{ color: colors.textMuted }}>
+              {orchestratorContext.intent} {orchestratorContext.confidence}
+            </span>
+          )}
+        </button>
       </div>
 
       <div className="flex items-center gap-1.5 flex-shrink-0">

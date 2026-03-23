@@ -7,6 +7,9 @@ import type {
   EnrichedError,
   Attachment,
   CatalogPlugin,
+  SandboxExecResult,
+  SandboxHandle,
+  SandboxOptions,
   SessionMeta,
   ShortcutCommand,
   SkillMeta,
@@ -52,6 +55,22 @@ export interface yaldAPI {
   uninstallMarketplaceSkill(pluginId: string): Promise<void>
   listSessions(projectPath?: string): Promise<SessionMeta[]>
   respondPermission(tabId: string, questionId: string, optionId: string): Promise<boolean>
+  sandboxCreate(): Promise<SandboxHandle>
+  sandboxExec(id: string, command: string, options?: SandboxOptions): Promise<SandboxExecResult>
+  sandboxWriteFile(id: string, relativePath: string, content: string): Promise<void>
+  sandboxReadFile(id: string, relativePath: string): Promise<string>
+  sandboxExposePort(id: string): Promise<{ port: number; url: string }>
+  sandboxGetLogs(id: string): Promise<string>
+  sandboxDestroy(id: string): Promise<void>
+  browserNavigate(url: string): Promise<void>
+  browserScreenshot(): Promise<string>
+  browserClick(selector: string): Promise<void>
+  browserType(selector: string, text: string): Promise<void>
+  browserReadDom(selector: string): Promise<string>
+  browserConsoleLogs(): Promise<Array<{ level: string; message: string }>>
+  browserClose(): Promise<void>
+  runVibePipeline(tabId: string, prompt: string, sandboxId: string): Promise<void>
+  stopVibePipeline(tabId: string): Promise<void>
   getTheme(): Promise<{ isDark: boolean }>
   onThemeChange(callback: (isDark: boolean) => void): () => void
 
@@ -74,6 +93,11 @@ export interface yaldAPI {
   onVisionEvent(callback: (event: VisionEvent) => void): () => void
   onWindowShown(callback: () => void): () => void
   onShortcutCommand(callback: (command: ShortcutCommand) => void): () => void
+  onPipelineStage(callback: (tabId: string, stage: string) => void): () => void
+  onPipelineLog(callback: (tabId: string, line: string) => void): () => void
+  onSandboxReady(callback: (tabId: string, url: string) => void): () => void
+  onPipelineComplete(callback: (tabId: string, summary: string) => void): () => void
+  onPipelineError(callback: (tabId: string, error: string) => void): () => void
 }
 
 const api: yaldAPI = {
@@ -112,6 +136,26 @@ const api: yaldAPI = {
   listSessions: (projectPath?: string) => ipcRenderer.invoke(IPC.LIST_SESSIONS, projectPath),
   respondPermission: (tabId: string, questionId: string, optionId: string) =>
     ipcRenderer.invoke(IPC.RESPOND_PERMISSION, { tabId, questionId, optionId }),
+  sandboxCreate: () => ipcRenderer.invoke(IPC.SANDBOX_CREATE),
+  sandboxExec: (id, command, options) =>
+    ipcRenderer.invoke(IPC.SANDBOX_EXEC, { id, command, options }),
+  sandboxWriteFile: (id, relativePath, content) =>
+    ipcRenderer.invoke(IPC.SANDBOX_WRITE_FILE, { id, relativePath, content }),
+  sandboxReadFile: (id, relativePath) =>
+    ipcRenderer.invoke(IPC.SANDBOX_READ_FILE, { id, relativePath }),
+  sandboxExposePort: (id) => ipcRenderer.invoke(IPC.SANDBOX_EXPOSE_PORT, { id }),
+  sandboxGetLogs: (id) => ipcRenderer.invoke(IPC.SANDBOX_GET_LOGS, { id }),
+  sandboxDestroy: (id) => ipcRenderer.invoke(IPC.SANDBOX_DESTROY, { id }),
+  browserNavigate: (url) => ipcRenderer.invoke(IPC.BROWSER_NAVIGATE, { url }),
+  browserScreenshot: () => ipcRenderer.invoke(IPC.BROWSER_SCREENSHOT),
+  browserClick: (selector) => ipcRenderer.invoke(IPC.BROWSER_CLICK, { selector }),
+  browserType: (selector, text) => ipcRenderer.invoke(IPC.BROWSER_TYPE, { selector, text }),
+  browserReadDom: (selector) => ipcRenderer.invoke(IPC.BROWSER_READ_DOM, { selector }),
+  browserConsoleLogs: () => ipcRenderer.invoke(IPC.BROWSER_CONSOLE_LOGS),
+  browserClose: () => ipcRenderer.invoke(IPC.BROWSER_CLOSE),
+  runVibePipeline: (tabId, prompt, sandboxId) =>
+    ipcRenderer.invoke(IPC.RUN_VIBE_PIPELINE, { tabId, prompt, sandboxId }),
+  stopVibePipeline: (tabId) => ipcRenderer.invoke(IPC.STOP_VIBE_PIPELINE, { tabId }),
   getTheme: () => ipcRenderer.invoke(IPC.GET_THEME),
   onThemeChange: (callback) => {
     const handler = (_e: Electron.IpcRendererEvent, isDark: boolean) => callback(isDark)
@@ -178,6 +222,41 @@ const api: yaldAPI = {
     const handler = (_e: Electron.IpcRendererEvent, command: ShortcutCommand) => callback(command)
     ipcRenderer.on(IPC.SHORTCUT_COMMAND, handler)
     return () => ipcRenderer.removeListener(IPC.SHORTCUT_COMMAND, handler)
+  },
+
+  onPipelineStage: (callback) => {
+    const handler = (_e: Electron.IpcRendererEvent, tabId: string, stage: string) =>
+      callback(tabId, stage)
+    ipcRenderer.on(IPC.PIPELINE_STAGE, handler)
+    return () => ipcRenderer.removeListener(IPC.PIPELINE_STAGE, handler)
+  },
+
+  onPipelineLog: (callback) => {
+    const handler = (_e: Electron.IpcRendererEvent, tabId: string, line: string) =>
+      callback(tabId, line)
+    ipcRenderer.on(IPC.PIPELINE_LOG, handler)
+    return () => ipcRenderer.removeListener(IPC.PIPELINE_LOG, handler)
+  },
+
+  onSandboxReady: (callback) => {
+    const handler = (_e: Electron.IpcRendererEvent, tabId: string, url: string) =>
+      callback(tabId, url)
+    ipcRenderer.on(IPC.SANDBOX_READY, handler)
+    return () => ipcRenderer.removeListener(IPC.SANDBOX_READY, handler)
+  },
+
+  onPipelineComplete: (callback) => {
+    const handler = (_e: Electron.IpcRendererEvent, tabId: string, summary: string) =>
+      callback(tabId, summary)
+    ipcRenderer.on(IPC.PIPELINE_COMPLETE, handler)
+    return () => ipcRenderer.removeListener(IPC.PIPELINE_COMPLETE, handler)
+  },
+
+  onPipelineError: (callback) => {
+    const handler = (_e: Electron.IpcRendererEvent, tabId: string, error: string) =>
+      callback(tabId, error)
+    ipcRenderer.on(IPC.PIPELINE_ERROR, handler)
+    return () => ipcRenderer.removeListener(IPC.PIPELINE_ERROR, handler)
   }
 }
 

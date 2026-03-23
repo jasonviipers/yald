@@ -10,11 +10,13 @@ import {
 import { TabStrip } from './components/TabStrip'
 import { ConversationView } from './components/ConversationView'
 import { InputBar } from './components/InputBar'
+import { PipelineStatus } from './components/PipelineStatus'
 import { StatusBar } from './components/StatusBar'
 import { MarketplacePanel } from './components/MarketplacePanel'
 import { PopoverLayerProvider } from './components/PopoverLayer'
 import { useClaudeEvents } from './hooks/useClaudeEvents'
 import { useHealthReconciliation } from './hooks/useHealthReconciliation'
+import { usePipelineEvents } from './hooks/usePipelineEvents'
 import { resolveProviderContext, useSessionStore } from './stores/sessionStore'
 import { spacing, useColors, useThemeStore } from './lib/theme'
 
@@ -23,6 +25,7 @@ const TRANSITION = { duration: 0.26, ease: [0.4, 0, 0.1, 1] as const }
 export default function App() {
   useClaudeEvents()
   useHealthReconciliation()
+  usePipelineEvents()
 
   const activeTabStatus = useSessionStore(
     (state) => state.tabs.find((tab) => tab.id === state.activeTabId)?.status
@@ -41,6 +44,9 @@ export default function App() {
   const visionFeedback = useSessionStore((state) => state.visionFeedback)
   const visionError = useSessionStore((state) => state.visionError)
   const visionTabId = useSessionStore((state) => state.visionTabId)
+  const activePipelineState = useSessionStore(
+    (state) => state.pipelineStateByTab[state.activeTabId] || null
+  )
   const toggleVision = useSessionStore((state) => state.toggleVision)
   const handleVisionEvent = useSessionStore((state) => state.handleVisionEvent)
   const colors = useColors()
@@ -247,6 +253,35 @@ export default function App() {
                   <MarketplacePanel />
                 </motion.div>
               )}
+            </AnimatePresence>
+
+            <AnimatePresence>
+              {activePipelineState &&
+                (activePipelineState.activeStage ||
+                  activePipelineState.deliverySummary ||
+                  activePipelineState.error ||
+                  activePipelineState.sandboxUrl ||
+                  activePipelineState.log.length > 0) && (
+                  <motion.div
+                    data-yald-ui
+                    initial={{ opacity: 0, y: 8, scale: 0.98 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 6, scale: 0.98 }}
+                    transition={transition}
+                    className="no-drag"
+                    style={{
+                      width: panelWidth,
+                      margin: '0 auto 10px',
+                      borderRadius: 20,
+                      border: `1px solid ${colors.containerBorder}`,
+                      background: colors.containerBg,
+                      boxShadow: colors.cardShadow,
+                      overflow: 'hidden'
+                    }}
+                  >
+                    <PipelineStatus />
+                  </motion.div>
+                )}
             </AnimatePresence>
 
             <AnimatePresence>

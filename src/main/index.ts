@@ -15,6 +15,7 @@ import {
 } from 'electron'
 import { join } from 'path'
 import { ControlPlane } from './claude/control-plane'
+import { BrowserAgentManager } from './browser-agent'
 import { log as _log, LOG_FILE, flushLogs } from './logger'
 import {
   fetchMarketplaceCatalog,
@@ -22,6 +23,8 @@ import {
   uninstallMarketplaceSkill
 } from './marketplace/catalog'
 import { installSkill, listInstalledSkills, uninstallSkill } from './skills/store'
+import { SandboxManager } from './sandbox'
+import { VibePipelineManager } from './vibe-pipeline'
 import { VisionAgentManager } from './vision/vision-agent-manager'
 import { transcribeAudioBase64 } from './voice/transcription'
 import { VoiceSessionManager } from './voice/voice-session-manager'
@@ -54,6 +57,9 @@ let toggleSequence = 0
 const INTERACTIVE_PTY = false
 
 const controlPlane = new ControlPlane(INTERACTIVE_PTY)
+const sandboxManager = new SandboxManager()
+const browserAgentManager = new BrowserAgentManager()
+const vibePipelineManager = new VibePipelineManager(sandboxManager, browserAgentManager)
 const voiceSessionManager = new VoiceSessionManager()
 const visionAgentManager = new VisionAgentManager(captureWindowScreenshotBase64, {
   createTab: () => broadcastShortcutCommand('new_tab'),
@@ -147,6 +153,26 @@ voiceSessionManager.on('event', (event: VoiceEvent) => {
 
 visionAgentManager.on('event', (event: VisionEvent) => {
   broadcast(IPC.VISION_EVENT, event)
+})
+
+vibePipelineManager.on('pipeline-stage', (tabId: string, stage: string) => {
+  broadcast(IPC.PIPELINE_STAGE, tabId, stage)
+})
+
+vibePipelineManager.on('pipeline-log', (tabId: string, line: string) => {
+  broadcast(IPC.PIPELINE_LOG, tabId, line)
+})
+
+vibePipelineManager.on('sandbox-ready', (tabId: string, url: string) => {
+  broadcast(IPC.SANDBOX_READY, tabId, url)
+})
+
+vibePipelineManager.on('pipeline-complete', (tabId: string, summary: string) => {
+  broadcast(IPC.PIPELINE_COMPLETE, tabId, summary)
+})
+
+vibePipelineManager.on('pipeline-error', (tabId: string, error: string) => {
+  broadcast(IPC.PIPELINE_ERROR, tabId, error)
 })
 
 // ─── Window Creation ───
@@ -782,6 +808,101 @@ ipcMain.handle(
   ) => controlPlane.respondToPermission(payload.tabId, payload.questionId, payload.optionId)
 )
 
+ipcMain.handle(IPC.SANDBOX_CREATE, async () => {
+  log('IPC SANDBOX_CREATE')
+  return sandboxManager.create()
+})
+
+ipcMain.handle(
+  IPC.SANDBOX_EXEC,
+  async (
+    _event,
+    payload: { id: string; command: string; options?: import('../shared/types').SandboxOptions }
+  ) => {
+    log(`IPC SANDBOX_EXEC: ${payload.id}`)
+    return sandboxManager.exec(payload.id, payload.command, payload.options)
+  }
+)
+
+ipcMain.handle(
+  IPC.SANDBOX_WRITE_FILE,
+  async (_event, payload: { id: string; relativePath: string; content: string }) => {
+    log(`IPC SANDBOX_WRITE_FILE: ${payload.id} ${payload.relativePath}`)
+    await sandboxManager.writeFile(payload.id, payload.relativePath, payload.content)
+  }
+)
+
+ipcMain.handle(
+  IPC.SANDBOX_READ_FILE,
+  async (_event, payload: { id: string; relativePath: string }) => {
+    log(`IPC SANDBOX_READ_FILE: ${payload.id} ${payload.relativePath}`)
+    return sandboxManager.readFile(payload.id, payload.relativePath)
+  }
+)
+
+ipcMain.handle(IPC.SANDBOX_EXPOSE_PORT, async (_event, payload: { id: string }) => {
+  log(`IPC SANDBOX_EXPOSE_PORT: ${payload.id}`)
+  return sandboxManager.exposePort(payload.id)
+})
+
+ipcMain.handle(IPC.SANDBOX_GET_LOGS, async (_event, payload: { id: string }) => {
+  log(`IPC SANDBOX_GET_LOGS: ${payload.id}`)
+  return sandboxManager.getLogs(payload.id)
+})
+
+ipcMain.handle(IPC.SANDBOX_DESTROY, async (_event, payload: { id: string }) => {
+  log(`IPC SANDBOX_DESTROY: ${payload.id}`)
+  await sandboxManager.destroy(payload.id)
+})
+
+ipcMain.handle(IPC.BROWSER_NAVIGATE, async (_event, payload: { url: string }) => {
+  log(`IPC BROWSER_NAVIGATE: ${payload.url}`)
+  await browserAgentManager.navigate(payload.url)
+})
+
+ipcMain.handle(IPC.BROWSER_SCREENSHOT, async () => {
+  log('IPC BROWSER_SCREENSHOT')
+  return browserAgentManager.screenshot()
+})
+
+ipcMain.handle(IPC.BROWSER_CLICK, async (_event, payload: { selector: string }) => {
+  log(`IPC BROWSER_CLICK: ${payload.selector}`)
+  await browserAgentManager.click(payload.selector)
+})
+
+ipcMain.handle(IPC.BROWSER_TYPE, async (_event, payload: { selector: string; text: string }) => {
+  log(`IPC BROWSER_TYPE: ${payload.selector}`)
+  await browserAgentManager.type(payload.selector, payload.text)
+})
+
+ipcMain.handle(IPC.BROWSER_READ_DOM, async (_event, payload: { selector: string }) => {
+  log(`IPC BROWSER_READ_DOM: ${payload.selector}`)
+  return browserAgentManager.readDom(payload.selector)
+})
+
+ipcMain.handle(IPC.BROWSER_CONSOLE_LOGS, async () => {
+  log('IPC BROWSER_CONSOLE_LOGS')
+  return browserAgentManager.consoleLogs()
+})
+
+ipcMain.handle(IPC.BROWSER_CLOSE, async () => {
+  log('IPC BROWSER_CLOSE')
+  await browserAgentManager.close()
+})
+
+ipcMain.handle(
+  IPC.RUN_VIBE_PIPELINE,
+  async (_event, payload: { tabId: string; prompt: string; sandboxId: string }) => {
+    log(`IPC RUN_VIBE_PIPELINE: tab=${payload.tabId}`)
+    await vibePipelineManager.run(payload.tabId, payload.prompt, payload.sandboxId)
+  }
+)
+
+ipcMain.handle(IPC.STOP_VIBE_PIPELINE, async (_event, payload: { tabId: string }) => {
+  log(`IPC STOP_VIBE_PIPELINE: tab=${payload.tabId}`)
+  await vibePipelineManager.stop(payload.tabId)
+})
+
 // ─── Theme Detection ───
 
 ipcMain.handle(IPC.GET_THEME, () => {
@@ -903,6 +1024,7 @@ app.whenReady().then(async () => {
 app.on('will-quit', () => {
   globalShortcut.unregisterAll()
   void visionAgentManager.stopSession()
+  void browserAgentManager.close()
   controlPlane.shutdown()
   flushLogs()
 })

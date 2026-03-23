@@ -40,6 +40,26 @@ const BASE_COMMANDS: SlashCommand[] = [
     icon: <span className="text-[11px]">x</span>
   },
   {
+    command: '/orchestrator',
+    description: 'Toggle specialist orchestrator mode',
+    icon: <span className="text-[11px]">x</span>
+  },
+  {
+    command: '/vibe',
+    description: 'Run the vibe code pipeline',
+    icon: <span className="text-[11px]">x</span>
+  },
+  {
+    command: '/sandbox',
+    description: 'Inspect or stop the active sandbox',
+    icon: <span className="text-[11px]">x</span>
+  },
+  {
+    command: '/pipeline',
+    description: 'Inspect the current pipeline log',
+    icon: <span className="text-[11px]">x</span>
+  },
+  {
     command: '/help',
     description: 'Show available commands',
     icon: <span className="text-[11px]">x</span>
@@ -61,9 +81,21 @@ export function InputBar() {
   const addAttachments = useSessionStore((state) => state.addAttachments)
   const removeAttachment = useSessionStore((state) => state.removeAttachment)
   const setPreferredModel = useSessionStore((state) => state.setPreferredModel)
+  const setOrchestratorEnabled = useSessionStore((state) => state.setOrchestratorEnabled)
+  const startVibePipeline = useSessionStore((state) => state.startVibePipeline)
+  const stopVibePipeline = useSessionStore((state) => state.stopVibePipeline)
   const preferredModel = useSessionStore((state) => state.preferredModel)
   const ollamaConfig = useSessionStore((state) => state.ollamaConfig)
   const installedSkills = useSessionStore((state) => state.installedSkills)
+  const orchestratorEnabled = useSessionStore(
+    (state) => state.orchestratorEnabledByTab[state.activeTabId] ?? true
+  )
+  const orchestratorContext = useSessionStore(
+    (state) => state.orchestratorContextByTab[state.activeTabId] || null
+  )
+  const pipelineState = useSessionStore(
+    (state) => state.pipelineStateByTab[state.activeTabId] || null
+  )
   const voiceShortcutNonce = useSessionStore((state) => state.voiceShortcutNonce)
   const activeTabId = useSessionStore((state) => state.activeTabId)
   const tab = useSessionStore((state) => state.tabs.find((item) => item.id === state.activeTabId))
@@ -233,6 +265,22 @@ export function InputBar() {
             )
           }
           break
+        case '/orchestrator':
+          addSystemMessage(
+            orchestratorContext
+              ? `Orchestrator ${orchestratorEnabled ? 'enabled' : 'disabled'}\n\nintent: ${orchestratorContext.intent}\nconfidence: ${orchestratorContext.confidence}\nsubtasks: ${orchestratorContext.plan.subtasks.length}\nskill gaps: ${orchestratorContext.skill_gaps.length || 0}`
+              : `Orchestrator ${orchestratorEnabled ? 'enabled' : 'disabled'}`
+          )
+          break
+        case '/vibe':
+          addSystemMessage('Usage: /vibe <prompt>')
+          break
+        case '/sandbox':
+          addSystemMessage('Usage: /sandbox status or /sandbox stop')
+          break
+        case '/pipeline':
+          addSystemMessage('Usage: /pipeline log')
+          break
         case '/help':
           addSystemMessage(
             [
@@ -246,7 +294,16 @@ export function InputBar() {
           break
       }
     },
-    [addSystemMessage, clearTab, installedSkills, preferredModel, tab]
+    [
+      addSystemMessage,
+      clearTab,
+      installedSkills,
+      orchestratorContext,
+      orchestratorEnabled,
+      pipelineState,
+      preferredModel,
+      tab
+    ]
   )
 
   const handleSlashSelect = useCallback(
@@ -258,7 +315,7 @@ export function InputBar() {
     [executeCommand]
   )
 
-  const handleSend = useCallback(() => {
+  const handleSend = useCallback(async () => {
     if (showSlashMenu) {
       const filtered = getFilteredCommandsWithExtras(slashFilter || '', BASE_COMMANDS)
       if (filtered.length > 0) {
@@ -269,6 +326,10 @@ export function InputBar() {
 
     const prompt = input.trim()
     const modelMatch = prompt.match(/^\/model\s+(\S+)/i)
+    const orchestratorMatch = prompt.match(/^\/orchestrator(?:\s+(on|off|status))?$/i)
+    const vibeMatch = prompt.match(/^\/vibe(?:\s+([\s\S]+))?$/i)
+    const sandboxMatch = prompt.match(/^\/sandbox(?:\s+(status|stop))?$/i)
+    const pipelineMatch = prompt.match(/^\/pipeline(?:\s+(log))?$/i)
     if (modelMatch) {
       const query = modelMatch[1].toLowerCase()
       const match = AVAILABLE_MODELS.find(
@@ -283,6 +344,87 @@ export function InputBar() {
       } else {
         addSystemMessage(`Unknown model "${modelMatch[1]}".`)
       }
+      return
+    }
+    if (orchestratorMatch) {
+      const action = (orchestratorMatch[1] || 'status').toLowerCase()
+      setInput('')
+      setSlashFilter(null)
+      if (action === 'on') {
+        setOrchestratorEnabled(true)
+        addSystemMessage('Specialist orchestrator enabled for this tab.')
+      } else if (action === 'off') {
+        setOrchestratorEnabled(false)
+        addSystemMessage('Specialist orchestrator disabled for this tab.')
+      } else {
+        executeCommand({
+          command: '/orchestrator',
+          description: 'Show orchestrator mode status',
+          icon: <span className="text-[11px]">x</span>
+        })
+      }
+      return
+    }
+    if (vibeMatch) {
+      const vibePrompt = (vibeMatch[1] || '').trim()
+      setInput('')
+      setSlashFilter(null)
+      if (!vibePrompt) {
+        executeCommand({
+          command: '/vibe',
+          description: 'Run the vibe code pipeline',
+          icon: <span className="text-[11px]">x</span>
+        })
+        return
+      }
+      await startVibePipeline(vibePrompt)
+      return
+    }
+    if (sandboxMatch) {
+      const action = (sandboxMatch[1] || 'status').toLowerCase()
+      setInput('')
+      setSlashFilter(null)
+      if (action === 'stop') {
+        await stopVibePipeline()
+        addSystemMessage('Sandbox stopped for this tab.')
+        return
+      }
+
+      if (!pipelineState?.sandboxId) {
+        addSystemMessage('No active sandbox for this tab.')
+        return
+      }
+
+      let resourceLine = 'resource usage unavailable'
+      try {
+        const logs = await window.yald.sandboxGetLogs(pipelineState.sandboxId)
+        const resourceMatches = [...logs.matchAll(/\[resource\]\s+rss=(\d+)/g)]
+        const lastMatch = resourceMatches.at(-1)
+        if (lastMatch?.[1]) {
+          const rssBytes = Number(lastMatch[1])
+          const rssMb = rssBytes / (1024 * 1024)
+          resourceLine = `rss ${rssMb.toFixed(1)} MB`
+        }
+      } catch {}
+
+      addSystemMessage(
+        [
+          `sandbox id: ${pipelineState.sandboxId}`,
+          `status: ${pipelineState.error ? 'failed' : pipelineState.sandboxUrl ? 'running' : 'provisioning'}`,
+          `url: ${pipelineState.sandboxUrl || 'not exposed yet'}`,
+          `resource usage: ${resourceLine}`
+        ].join('\n')
+      )
+      return
+    }
+    if (pipelineMatch) {
+      setInput('')
+      setSlashFilter(null)
+      if (!pipelineState || pipelineState.log.length === 0) {
+        addSystemMessage('No pipeline log available for this tab.')
+        return
+      }
+      addSystemMessage(`Pipeline log\n\n${pipelineState.log.join('\n')}`)
       return
     }
 
@@ -300,11 +442,15 @@ export function InputBar() {
     handleSlashSelect,
     input,
     isConnecting,
+    pipelineState,
     sendMessage,
+    startVibePipeline,
+    setOrchestratorEnabled,
     setPreferredModel,
     showSlashMenu,
     slashFilter,
-    slashIndex
+    slashIndex,
+    stopVibePipeline
   ])
 
   const handleKeyDown = (event: React.KeyboardEvent) => {

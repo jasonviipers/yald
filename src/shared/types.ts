@@ -484,6 +484,51 @@ export interface EnrichedError {
   permissionDenials?: Array<{ tool_name: string; tool_use_id: string }>
 }
 
+export interface SandboxHandle {
+  id: string
+  workdir: string
+  status: 'provisioning' | 'running' | 'failed' | 'destroyed'
+  port: number | null
+  url: string | null
+}
+
+export interface SandboxExecResult {
+  exitCode: number | null
+  stdout: string
+  stderr: string
+  durationMs: number
+}
+
+export interface SandboxOptions {
+  env?: Record<string, string>
+  timeoutMs?: number
+}
+
+export interface PipelineStage {
+  id:
+    | 'skill_inventory_check'
+    | 'brainstorm'
+    | 'skill_forge'
+    | 'engineer'
+    | 'sandbox'
+    | 'browser'
+    | 'qa'
+  label: string
+  status: 'pending' | 'running' | 'complete' | 'failed'
+  startedAt: number | null
+  completedAt: number | null
+}
+
+export interface VibePipelineState {
+  stages: PipelineStage[]
+  activeStage: PipelineStage['id'] | null
+  log: string[]
+  sandboxId: string | null
+  sandboxUrl: string | null
+  deliverySummary: string | null
+  error: string | null
+}
+
 // ─── Session History ───
 
 // ─── IPC Channel Names ───
@@ -518,6 +563,22 @@ export const IPC = {
   UNINSTALL_MARKETPLACE_SKILL: 'yald:uninstall-marketplace-skill',
   LIST_SESSIONS: 'yald:list-sessions',
   RESPOND_PERMISSION: 'yald:respond-permission',
+  SANDBOX_CREATE: 'yald:sandbox-create',
+  SANDBOX_EXEC: 'yald:sandbox-exec',
+  SANDBOX_WRITE_FILE: 'yald:sandbox-write-file',
+  SANDBOX_READ_FILE: 'yald:sandbox-read-file',
+  SANDBOX_EXPOSE_PORT: 'yald:sandbox-expose-port',
+  SANDBOX_GET_LOGS: 'yald:sandbox-get-logs',
+  SANDBOX_DESTROY: 'yald:sandbox-destroy',
+  BROWSER_NAVIGATE: 'yald:browser-navigate',
+  BROWSER_SCREENSHOT: 'yald:browser-screenshot',
+  BROWSER_CLICK: 'yald:browser-click',
+  BROWSER_TYPE: 'yald:browser-type',
+  BROWSER_READ_DOM: 'yald:browser-read-dom',
+  BROWSER_CONSOLE_LOGS: 'yald:browser-console-logs',
+  BROWSER_CLOSE: 'yald:browser-close',
+  RUN_VIBE_PIPELINE: 'yald:run-vibe-pipeline',
+  STOP_VIBE_PIPELINE: 'yald:stop-vibe-pipeline',
   ANIMATE_HEIGHT: 'yald:animate-height',
 
   // One-way events (main → renderer)
@@ -534,6 +595,11 @@ export const IPC = {
   VOICE_EVENT: 'yald:voice-event',
   VISION_EVENT: 'yald:vision-event',
   SHORTCUT_COMMAND: 'yald:shortcut-command',
+  PIPELINE_STAGE: 'yald:pipeline-stage',
+  PIPELINE_LOG: 'yald:pipeline-log',
+  SANDBOX_READY: 'yald:sandbox-ready',
+  PIPELINE_COMPLETE: 'yald:pipeline-complete',
+  PIPELINE_ERROR: 'yald:pipeline-error',
 
   // Window management
   RESIZE_HEIGHT: 'yald:resize-height',

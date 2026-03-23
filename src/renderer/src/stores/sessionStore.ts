@@ -7,14 +7,25 @@ import {
 } from '@renderer/lib/llm'
 import { isOllamaCloudUrl, resolveBackendUrl } from '@shared/backend-url'
 import {
+  buildOrchestratorSystemPrompt,
+  buildSpecialistContext,
+  createSpecialistLogEntry,
+  extractOrchestratorContextUpdate,
+  mergeSpecialistContext,
+  type SpecialistSharedContext
+} from '@shared/orchestrator'
+import {
   Attachment,
   EnrichedError,
   NormalizedEvent,
+  PipelineStage,
   PromptHistoryMessage,
   ProviderContext,
+  SandboxHandle,
   SkillMeta,
   TabState,
   TabStatus,
+  VibePipelineState,
   VisionEvent,
   VisionFeedback,
   VisionSessionState
@@ -83,6 +94,120 @@ function sortSkills(skills: SkillMeta[]): SkillMeta[] {
   return [...skills].sort((a, b) => a.name.localeCompare(b.name))
 }
 
+function createInitialPipelineState(): VibePipelineState {
+  return {
+    stages: [
+      {
+        id: 'skill_inventory_check',
+        label: 'Skill Inventory',
+        status: 'pending',
+        startedAt: null,
+        completedAt: null
+      },
+      {
+        id: 'brainstorm',
+        label: 'Brainstorm',
+        status: 'pending',
+        startedAt: null,
+        completedAt: null
+      },
+      {
+        id: 'skill_forge',
+        label: 'Skill Forge',
+        status: 'pending',
+        startedAt: null,
+        completedAt: null
+      },
+      {
+        id: 'engineer',
+        label: 'Engineer',
+        status: 'pending',
+        startedAt: null,
+        completedAt: null
+      },
+      {
+        id: 'sandbox',
+        label: 'Sandbox',
+        status: 'pending',
+        startedAt: null,
+        completedAt: null
+      },
+      {
+        id: 'browser',
+        label: 'Browser',
+        status: 'pending',
+        startedAt: null,
+        completedAt: null
+      },
+      {
+        id: 'qa',
+        label: 'QA',
+        status: 'pending',
+        startedAt: null,
+        completedAt: null
+      }
+    ],
+    activeStage: null,
+    log: [],
+    sandboxId: null,
+    sandboxUrl: null,
+    deliverySummary: null,
+    error: null
+  }
+}
+
+function isPipelineStageId(value: string): value is PipelineStage['id'] {
+  return [
+    'skill_inventory_check',
+    'brainstorm',
+    'skill_forge',
+    'engineer',
+    'sandbox',
+    'browser',
+    'qa'
+  ].includes(value)
+}
+
+function updatePipelineStageState(
+  pipelineState: VibePipelineState,
+  activeStage: PipelineStage['id'] | null,
+  stageStatus: PipelineStage['status']
+): VibePipelineState {
+  const now = Date.now()
+
+  return {
+    ...pipelineState,
+    activeStage: stageStatus === 'running' ? activeStage : pipelineState.activeStage,
+    stages: pipelineState.stages.map((stage) => {
+      if (activeStage && stage.id === activeStage) {
+        return {
+          ...stage,
+          status: stageStatus,
+          startedAt: stageStatus === 'running' ? (stage.startedAt ?? now) : stage.startedAt,
+          completedAt: stageStatus === 'running' ? null : now
+        }
+      }
+
+      if (activeStage && stageStatus === 'running' && stage.status === 'running') {
+        return {
+          ...stage,
+          status: 'complete',
+          completedAt: stage.completedAt ?? now
+        }
+      }
+
+      return stage
+    })
+  }
+}
+
+function appendPipelineLog(pipelineState: VibePipelineState, line: string): VibePipelineState {
+  return {
+    ...pipelineState,
+    log: [...pipelineState.log, line].slice(-200)
+  }
+}
+
 function reconcileSelectedSkillIds(
   installedSkills: SkillMeta[],
   selectedSkillIds: string[],
@@ -105,6 +230,17 @@ interface StaticInfo {
 interface State {
   tabs: TabState[]
   activeTabId: string
+  orchestratorEnabledByTab: Record<string, boolean>
+  orchestratorContextByTab: Record<string, SpecialistSharedContext | null>
+  pipelineStateByTab: Record<string, VibePipelineState>
+  pipelineTabId: string | null
+  sandboxId: string | null
+  sandboxUrl: string | null
+  sandboxStatus: SandboxHandle['status'] | null
+  pipelineStage: string | null
+  pipelineLog: string[]
+  pipelineSummary: string | null
+  pipelineError: string | null
   isExpanded: boolean
   skillsPanelOpen: boolean
   settingsOpen: boolean
@@ -127,6 +263,15 @@ interface State {
   closeSkillsPanel: () => void
   toggleSettingsOpen: () => void
   closeSettings: () => void
+  toggleOrchestratorMode: () => void
+  setOrchestratorEnabled: (enabled: boolean, tabId?: string) => void
+  startVibePipeline: (prompt: string) => Promise<void>
+  stopVibePipeline: () => Promise<void>
+  handlePipelineStage: (tabId: string, stage: string) => void
+  handlePipelineLog: (tabId: string, line: string) => void
+  handleSandboxReady: (tabId: string, url: string) => void
+  handlePipelineComplete: (tabId: string, summary: string) => void
+  handlePipelineError: (tabId: string, error: string) => void
   requestVoiceToggle: () => void
   startVision: (provider: ProviderContext) => Promise<void>
   stopVision: () => Promise<void>
@@ -240,6 +385,17 @@ const storedSkillSelection = loadStoredSkillSelection()
 export const useSessionStore = create<State>((set, get) => ({
   tabs: [initialTab],
   activeTabId: initialTab.id,
+  orchestratorEnabledByTab: { [initialTab.id]: true },
+  orchestratorContextByTab: { [initialTab.id]: null },
+  pipelineStateByTab: {},
+  pipelineTabId: null,
+  sandboxId: null,
+  sandboxUrl: null,
+  sandboxStatus: null,
+  pipelineStage: null,
+  pipelineLog: [],
+  pipelineSummary: null,
+  pipelineError: null,
   isExpanded: false,
   skillsPanelOpen: false,
   settingsOpen: false,
@@ -316,6 +472,307 @@ export const useSessionStore = create<State>((set, get) => ({
     set((state) => ({ settingsOpen: !state.settingsOpen, skillsPanelOpen: false })),
 
   closeSettings: () => set({ settingsOpen: false }),
+
+  toggleOrchestratorMode: () => {
+    const { activeTabId, orchestratorEnabledByTab } = get()
+    if (!activeTabId) return
+    const current = orchestratorEnabledByTab[activeTabId] ?? true
+    get().setOrchestratorEnabled(!current, activeTabId)
+  },
+
+  setOrchestratorEnabled: (enabled, tabId) => {
+    const targetTabId = tabId || get().activeTabId
+    if (!targetTabId) return
+    set((state) => ({
+      orchestratorEnabledByTab: {
+        ...state.orchestratorEnabledByTab,
+        [targetTabId]: enabled
+      },
+      orchestratorContextByTab: enabled
+        ? state.orchestratorContextByTab
+        : {
+            ...state.orchestratorContextByTab,
+            [targetTabId]: null
+          }
+    }))
+  },
+
+  startVibePipeline: async (prompt) => {
+    const { activeTabId, tabs } = get()
+    const tab = tabs.find((item) => item.id === activeTabId)
+    if (!activeTabId || !tab) return
+
+    const effectivePrompt = prompt.trim()
+    if (!effectivePrompt) return
+
+    let skillInventoryCount = get().installedSkills.length
+    try {
+      const installedSkills = await window.yald.listSkills()
+      skillInventoryCount = installedSkills.length
+      set({ installedSkills: sortSkills(installedSkills) })
+    } catch {}
+
+    set((state) => {
+      const pipelineState = appendPipelineLog(
+        updatePipelineStageState(createInitialPipelineState(), 'skill_inventory_check', 'running'),
+        `[pipeline] starting`
+      )
+      const pipelineStateWithSkills = appendPipelineLog(
+        pipelineState,
+        `[pipeline] skills available ${skillInventoryCount}`
+      )
+
+      return {
+        pipelineTabId: activeTabId,
+        pipelineStage: 'skill_inventory_check',
+        pipelineLog: pipelineStateWithSkills.log,
+        pipelineSummary: null,
+        pipelineError: null,
+        sandboxUrl: null,
+        sandboxStatus: 'provisioning',
+        pipelineStateByTab: {
+          ...state.pipelineStateByTab,
+          [activeTabId]: {
+            ...pipelineStateWithSkills,
+            sandboxId: null,
+            sandboxUrl: null
+          }
+        },
+        tabs: state.tabs.map((item) =>
+          item.id === activeTabId
+            ? {
+                ...item,
+                messages: [
+                  ...item.messages,
+                  {
+                    id: nextMsgId(),
+                    role: 'user' as const,
+                    content: effectivePrompt,
+                    timestamp: Date.now()
+                  }
+                ]
+              }
+            : item
+        )
+      }
+    })
+
+    try {
+      const sandbox = await window.yald.sandboxCreate()
+      set((state) => {
+        const current = state.pipelineStateByTab[activeTabId] ?? createInitialPipelineState()
+        const withSandbox = appendPipelineLog(
+          appendPipelineLog(
+            {
+              ...current,
+              sandboxId: sandbox.id
+            },
+            `[pipeline] sandbox created ${sandbox.id}`
+          ),
+          `[pipeline] using skills inventory from window.yald.listSkills()`
+        )
+
+        return {
+          sandboxId: sandbox.id,
+          sandboxStatus: sandbox.status,
+          pipelineLog: withSandbox.log,
+          pipelineStateByTab: {
+            ...state.pipelineStateByTab,
+            [activeTabId]: withSandbox
+          }
+        }
+      })
+
+      await window.yald.runVibePipeline(activeTabId, effectivePrompt, sandbox.id)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      get().handlePipelineError(activeTabId, message)
+    }
+  },
+
+  stopVibePipeline: async () => {
+    const { pipelineTabId, sandboxId } = get()
+    if (pipelineTabId) {
+      try {
+        await window.yald.stopVibePipeline(pipelineTabId)
+      } catch {}
+    }
+    if (sandboxId) {
+      try {
+        await window.yald.sandboxDestroy(sandboxId)
+      } catch {}
+    }
+    set((state) => {
+      const nextPipelineStateByTab = { ...state.pipelineStateByTab }
+      if (pipelineTabId) {
+        const current = nextPipelineStateByTab[pipelineTabId] ?? createInitialPipelineState()
+        nextPipelineStateByTab[pipelineTabId] = {
+          ...current,
+          activeStage: null,
+          sandboxUrl: null,
+          error: current.error,
+          log: [...current.log, '[pipeline] stopped'].slice(-200)
+        }
+      }
+
+      return {
+        pipelineStateByTab: nextPipelineStateByTab,
+        pipelineTabId: null,
+        sandboxId: null,
+        sandboxUrl: null,
+        sandboxStatus: 'destroyed',
+        pipelineStage: null,
+        pipelineLog: [],
+        pipelineSummary: null,
+        pipelineError: null
+      }
+    })
+  },
+
+  handlePipelineStage: (tabId, stage) => {
+    set((state) => {
+      if (state.pipelineTabId && state.pipelineTabId !== tabId) return state
+      const current = state.pipelineStateByTab[tabId] ?? createInitialPipelineState()
+      const nextPipelineState = isPipelineStageId(stage)
+        ? updatePipelineStageState(current, stage, 'running')
+        : current
+
+      return {
+        pipelineStateByTab: {
+          ...state.pipelineStateByTab,
+          [tabId]: nextPipelineState
+        },
+        pipelineTabId: tabId,
+        pipelineStage: stage,
+        pipelineLog: nextPipelineState.log,
+        pipelineSummary: nextPipelineState.deliverySummary,
+        pipelineError: null,
+        sandboxId: nextPipelineState.sandboxId,
+        sandboxUrl: nextPipelineState.sandboxUrl,
+        sandboxStatus: state.sandboxStatus
+      }
+    })
+  },
+
+  handlePipelineLog: (tabId, line) => {
+    set((state) => {
+      if (state.pipelineTabId && state.pipelineTabId !== tabId) return state
+      const current = state.pipelineStateByTab[tabId] ?? createInitialPipelineState()
+      const nextPipelineState = appendPipelineLog(current, line)
+      return {
+        pipelineStateByTab: {
+          ...state.pipelineStateByTab,
+          [tabId]: nextPipelineState
+        },
+        pipelineTabId: tabId,
+        pipelineLog: nextPipelineState.log
+      }
+    })
+  },
+
+  handleSandboxReady: (tabId, url) => {
+    set((state) => {
+      if (state.pipelineTabId && state.pipelineTabId !== tabId) return state
+      const current = state.pipelineStateByTab[tabId] ?? createInitialPipelineState()
+      const nextPipelineState = appendPipelineLog(
+        {
+          ...current,
+          sandboxUrl: url
+        },
+        `[pipeline] sandbox ready ${url}`
+      )
+      return {
+        pipelineStateByTab: {
+          ...state.pipelineStateByTab,
+          [tabId]: nextPipelineState
+        },
+        pipelineTabId: tabId,
+        sandboxUrl: url,
+        sandboxStatus: 'running',
+        pipelineLog: nextPipelineState.log
+      }
+    })
+  },
+
+  handlePipelineComplete: (tabId, summary) => {
+    set((state) => {
+      if (state.pipelineTabId && state.pipelineTabId !== tabId) return state
+      const current = state.pipelineStateByTab[tabId] ?? createInitialPipelineState()
+      const activeStage = current.activeStage
+      const completedState =
+        activeStage && isPipelineStageId(activeStage)
+          ? updatePipelineStageState(current, activeStage, 'complete')
+          : current
+      const nextPipelineState = appendPipelineLog(
+        {
+          ...completedState,
+          activeStage: null,
+          deliverySummary: summary
+        },
+        '[pipeline] complete'
+      )
+      return {
+        pipelineStateByTab: {
+          ...state.pipelineStateByTab,
+          [tabId]: nextPipelineState
+        },
+        pipelineTabId: tabId,
+        pipelineStage: null,
+        pipelineSummary: summary,
+        pipelineLog: nextPipelineState.log
+      }
+    })
+
+    set((state) => ({
+      tabs: state.tabs.map((tab) =>
+        tab.id === tabId
+          ? {
+              ...tab,
+              messages: [
+                ...tab.messages,
+                {
+                  id: nextMsgId(),
+                  role: 'assistant' as const,
+                  content: summary,
+                  timestamp: Date.now()
+                }
+              ]
+            }
+          : tab
+      )
+    }))
+  },
+
+  handlePipelineError: (tabId, error) => {
+    set((state) => {
+      const current = state.pipelineStateByTab[tabId] ?? createInitialPipelineState()
+      const activeStage = current.activeStage
+      const failedState =
+        activeStage && isPipelineStageId(activeStage)
+          ? updatePipelineStageState(current, activeStage, 'failed')
+          : current
+      const nextPipelineState = appendPipelineLog(
+        {
+          ...failedState,
+          activeStage: null,
+          error
+        },
+        `[pipeline] error ${error}`
+      )
+
+      return {
+        pipelineStateByTab: {
+          ...state.pipelineStateByTab,
+          [tabId]: nextPipelineState
+        },
+        pipelineTabId: tabId,
+        pipelineError: error,
+        pipelineStage: null,
+        pipelineLog: nextPipelineState.log,
+        sandboxStatus: state.sandboxStatus === 'destroyed' ? state.sandboxStatus : 'failed'
+      }
+    })
+  },
 
   requestVoiceToggle: () =>
     set((state) => ({
@@ -455,6 +912,18 @@ export const useSessionStore = create<State>((set, get) => ({
     set((state) => ({
       tabs: [...state.tabs, newTab],
       activeTabId: tabId,
+      orchestratorEnabledByTab: {
+        ...state.orchestratorEnabledByTab,
+        [tabId]: state.orchestratorEnabledByTab[state.activeTabId] ?? true
+      },
+      orchestratorContextByTab: {
+        ...state.orchestratorContextByTab,
+        [tabId]: null
+      },
+      pipelineStateByTab: {
+        ...state.pipelineStateByTab,
+        [tabId]: createInitialPipelineState()
+      },
       isExpanded: true,
       skillsPanelOpen: false,
       settingsOpen: false
@@ -475,12 +944,33 @@ export const useSessionStore = create<State>((set, get) => ({
           : prev.tabs
       }))
     } else {
-      set((prev) => ({
-        activeTabId: tabId,
-        settingsOpen: false,
-        skillsPanelOpen: false,
-        tabs: prev.tabs.map((tab) => (tab.id === tabId ? { ...tab, hasUnread: false } : tab))
-      }))
+      set((prev) => {
+        const pipelineState = prev.pipelineStateByTab[tabId] ?? null
+        return {
+          activeTabId: tabId,
+          settingsOpen: false,
+          skillsPanelOpen: false,
+          pipelineTabId: pipelineState
+            ? tabId
+            : prev.pipelineTabId === tabId
+              ? tabId
+              : prev.pipelineTabId,
+          sandboxId: pipelineState?.sandboxId ?? null,
+          sandboxUrl: pipelineState?.sandboxUrl ?? null,
+          sandboxStatus: pipelineState?.error
+            ? 'failed'
+            : pipelineState?.sandboxUrl
+              ? 'running'
+              : pipelineState?.sandboxId
+                ? 'provisioning'
+                : null,
+          pipelineStage: pipelineState?.activeStage ?? null,
+          pipelineLog: pipelineState?.log ?? [],
+          pipelineSummary: pipelineState?.deliverySummary ?? null,
+          pipelineError: pipelineState?.error ?? null,
+          tabs: prev.tabs.map((tab) => (tab.id === tabId ? { ...tab, hasUnread: false } : tab))
+        }
+      })
     }
   },
 
@@ -498,21 +988,37 @@ export const useSessionStore = create<State>((set, get) => ({
   },
 
   closeTab: (tabId) => {
-    const { activeTabId, tabs, visionTabId } = get()
+    const { activeTabId, tabs, visionTabId, pipelineTabId } = get()
     if (tabs.length <= 1) return
 
     window.yald.closeTab(tabId).catch(() => {})
     if (visionTabId === tabId) {
       void get().stopVision()
     }
+    if (pipelineTabId === tabId) {
+      void get().stopVibePipeline()
+    }
 
     const remaining = tabs.filter((tab) => tab.id !== tabId)
     const closedIndex = tabs.findIndex((tab) => tab.id === tabId)
     const fallbackTab = remaining[Math.max(0, closedIndex - 1)] || remaining[0]
 
+    const nextOrchestratorEnabledByTab = Object.fromEntries(
+      Object.entries(get().orchestratorEnabledByTab).filter(([key]) => key !== tabId)
+    )
+    const nextOrchestratorContextByTab = Object.fromEntries(
+      Object.entries(get().orchestratorContextByTab).filter(([key]) => key !== tabId)
+    )
+    const nextPipelineStateByTab = Object.fromEntries(
+      Object.entries(get().pipelineStateByTab).filter(([key]) => key !== tabId)
+    )
+
     set({
       tabs: remaining,
-      activeTabId: activeTabId === tabId ? fallbackTab.id : activeTabId
+      activeTabId: activeTabId === tabId ? fallbackTab.id : activeTabId,
+      orchestratorEnabledByTab: nextOrchestratorEnabledByTab,
+      orchestratorContextByTab: nextOrchestratorContextByTab,
+      pipelineStateByTab: nextPipelineStateByTab
     })
   },
 
@@ -629,7 +1135,16 @@ export const useSessionStore = create<State>((set, get) => ({
   },
 
   sendMessage: (prompt, projectPath) => {
-    const { activeTabId, tabs, staticInfo, preferredModel, ollamaConfig, selectedSkillIds } = get()
+    const {
+      activeTabId,
+      tabs,
+      staticInfo,
+      preferredModel,
+      ollamaConfig,
+      selectedSkillIds,
+      installedSkills,
+      orchestratorEnabledByTab
+    } = get()
     const tab = tabs.find((item) => item.id === activeTabId)
     const resolvedPath =
       projectPath ||
@@ -642,15 +1157,57 @@ export const useSessionStore = create<State>((set, get) => ({
     const isBusy = tab.status === 'running'
     const requestId = crypto.randomUUID()
     const providerContext = resolveProviderContextInternal(preferredModel, ollamaConfig)
+    const effectivePrompt = prompt || 'See attached files'
+    const orchestratorEnabled = orchestratorEnabledByTab[activeTabId] ?? true
+    const orchestratorContext = orchestratorEnabled
+      ? buildSpecialistContext({
+          taskId: requestId,
+          userPrompt: effectivePrompt,
+          installedSkills,
+          workingDirectory: resolvedPath,
+          projectPath: staticInfo?.projectPath
+        })
+      : null
+    if (orchestratorEnabled && orchestratorContext?.intent === 'vibe_code') {
+      void get().startVibePipeline(effectivePrompt)
+      return
+    }
+    const systemPrompt =
+      orchestratorEnabled && orchestratorContext
+        ? buildOrchestratorSystemPrompt(orchestratorContext)
+        : undefined
 
     const title =
       tab.messages.length === 0
-        ? prompt.length > 30
-          ? `${prompt.substring(0, 27)}...`
-          : prompt
+        ? effectivePrompt.length > 30
+          ? `${effectivePrompt.substring(0, 27)}...`
+          : effectivePrompt
         : tab.title
 
     set((state) => ({
+      orchestratorContextByTab:
+        orchestratorEnabled && orchestratorContext
+          ? {
+              ...state.orchestratorContextByTab,
+              [activeTabId]: {
+                ...orchestratorContext,
+                log: [
+                  ...orchestratorContext.log,
+                  createSpecialistLogEntry(
+                    'orchestrator',
+                    'info',
+                    'prompt_dispatched',
+                    {
+                      tabId: activeTabId,
+                      attachmentCount: tab.attachments.length,
+                      selectedSkillIds
+                    },
+                    orchestratorContext.confidence
+                  )
+                ]
+              }
+            }
+          : state.orchestratorContextByTab,
       tabs: state.tabs.map((item) => {
         if (item.id !== activeTabId) return item
         const withEffectiveBase = item.hasChosenDirectory
@@ -662,7 +1219,7 @@ export const useSessionStore = create<State>((set, get) => ({
             ...withEffectiveBase,
             title,
             attachments: [],
-            queuedPrompts: [...withEffectiveBase.queuedPrompts, prompt]
+            queuedPrompts: [...withEffectiveBase.queuedPrompts, effectivePrompt]
           }
         }
 
@@ -675,7 +1232,12 @@ export const useSessionStore = create<State>((set, get) => ({
           attachments: [],
           messages: [
             ...withEffectiveBase.messages,
-            { id: nextMsgId(), role: 'user' as const, content: prompt, timestamp: Date.now() }
+            {
+              id: nextMsgId(),
+              role: 'user' as const,
+              content: effectivePrompt,
+              timestamp: Date.now()
+            }
           ]
         }
       })
@@ -683,7 +1245,7 @@ export const useSessionStore = create<State>((set, get) => ({
 
     void window.yald
       .prompt(activeTabId, requestId, {
-        prompt,
+        prompt: effectivePrompt,
         projectPath: resolvedPath,
         sessionId: tab.claudeSessionId || undefined,
         model: providerContext.model,
@@ -691,7 +1253,8 @@ export const useSessionStore = create<State>((set, get) => ({
         skillIds: selectedSkillIds,
         provider: providerContext,
         history: toPromptHistory(tab.messages),
-        attachments: tab.attachments
+        attachments: tab.attachments,
+        systemPrompt
       })
       .catch((error: unknown) => {
         const message = error instanceof Error ? error.message : String(error)
@@ -709,6 +1272,7 @@ export const useSessionStore = create<State>((set, get) => ({
   handleNormalizedEvent: (tabId, event) => {
     set((state) => {
       const { activeTabId } = state
+      let nextOrchestratorContextByTab = state.orchestratorContextByTab
       const tabs = state.tabs.map((tab) => {
         if (tab.id !== tabId) return tab
         const updated = { ...tab }
@@ -831,6 +1395,33 @@ export const useSessionStore = create<State>((set, get) => ({
                 ]
               }
             }
+            const lastAssistantIndex = (() => {
+              for (let i = updated.messages.length - 1; i >= 0; i -= 1) {
+                if (updated.messages[i].role === 'assistant' && !updated.messages[i].toolName) {
+                  return i
+                }
+              }
+              return -1
+            })()
+            const specialistContext = state.orchestratorContextByTab[tabId]
+            if (specialistContext && lastAssistantIndex !== -1) {
+              const lastAssistant = updated.messages[lastAssistantIndex]
+              const parsed = extractOrchestratorContextUpdate(lastAssistant.content)
+              if (parsed.cleanedText !== lastAssistant.content) {
+                updated.messages = [
+                  ...updated.messages.slice(0, lastAssistantIndex),
+                  {
+                    ...lastAssistant,
+                    content: parsed.cleanedText
+                  },
+                  ...updated.messages.slice(lastAssistantIndex + 1)
+                ]
+              }
+              nextOrchestratorContextByTab = {
+                ...nextOrchestratorContextByTab,
+                [tabId]: mergeSpecialistContext(specialistContext, parsed.update)
+              }
+            }
             if (tabId !== activeTabId || !state.isExpanded) updated.hasUnread = true
             playNotificationIfHidden()
             break
@@ -898,7 +1489,10 @@ export const useSessionStore = create<State>((set, get) => ({
         return updated
       })
 
-      return { tabs }
+      return {
+        tabs,
+        orchestratorContextByTab: nextOrchestratorContextByTab
+      }
     })
   },
 
@@ -918,6 +1512,28 @@ export const useSessionStore = create<State>((set, get) => ({
 
   handleError: (tabId, error) => {
     set((state) => ({
+      orchestratorContextByTab: state.orchestratorContextByTab[tabId]
+        ? {
+            ...state.orchestratorContextByTab,
+            [tabId]: {
+              ...state.orchestratorContextByTab[tabId]!,
+              log: [
+                ...state.orchestratorContextByTab[tabId]!.log,
+                createSpecialistLogEntry(
+                  'orchestrator',
+                  'error',
+                  'run_failed',
+                  {
+                    message: error.message,
+                    exitCode: error.exitCode,
+                    elapsedMs: error.elapsedMs
+                  },
+                  state.orchestratorContextByTab[tabId]!.confidence
+                )
+              ]
+            }
+          }
+        : state.orchestratorContextByTab,
       tabs: state.tabs.map((tab) => {
         if (tab.id !== tabId) return tab
         const lastMsg = tab.messages[tab.messages.length - 1]
