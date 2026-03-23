@@ -32,6 +32,8 @@ This README helps contributors and users run the project locally, build packages
 - Git
 - OS-specific: Windows build requires Visual Studio build tools; macOS requires Xcode Command Line Tools
 
+> 🔐 Security note: do not commit `.env` or any secret keys to Git. This repo already includes `.env` and `.env.*` in `.gitignore`.
+
 ## 🧩 Setup
 
 1. Clone repository
