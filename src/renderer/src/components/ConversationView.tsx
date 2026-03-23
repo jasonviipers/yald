@@ -123,33 +123,29 @@ export function ConversationView() {
 
   return (
     <div data-yald-ui>
-      {/* Messages */}
       <div
         ref={scrollRef}
-        className="overflow-y-auto overflow-x-hidden conversation-selectable"
-        style={{
-          maxHeight: expandedUI ? 460 : 336,
-          padding: '8px 14px 32px',
-          scrollbarWidth: 'thin'
-        }}
+        className="overflow-y-auto overflow-x-hidden conversation-selectable hide-scrollbar"
+        style={{ maxHeight: expandedUI ? 460 : 336, padding: '10px 14px 28px' }}
         onScroll={handleScroll}
       >
         {hasOlder && (
-          <div style={{ display: 'flex', justifyContent: 'center', padding: '8px 0' }}>
+          <div style={{ display: 'flex', justifyContent: 'center', padding: '6px 0 10px' }}>
             <button
               onClick={() => setRenderOffset((o) => o + 1)}
               style={{
-                fontSize: 11,
-                padding: '4px 12px',
+                fontSize: 10.5,
+                padding: '3px 11px',
                 borderRadius: 9999,
                 color: colors.textTertiary,
-                border: `1px solid rgba(255,255,255,0.08)`,
+                border: `1px solid rgba(255,255,255,0.07)`,
                 background: 'transparent',
                 cursor: 'pointer',
-                transition: 'background 0.15s'
+                letterSpacing: '-0.01em',
+                transition: 'background 0.12s'
               }}
               onMouseEnter={(e) =>
-                ((e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.05)')
+                ((e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.04)')
               }
               onMouseLeave={(e) =>
                 ((e.currentTarget as HTMLElement).style.background = 'transparent')
@@ -160,7 +156,7 @@ export function ConversationView() {
           </div>
         )}
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
           {grouped.map((item, idx) => {
             const isHistorical = startIndex + idx < historicalThreshold
             switch (item.kind) {
@@ -218,24 +214,24 @@ export function ConversationView() {
           alignItems: 'center',
           justifyContent: 'space-between',
           padding: '0 14px',
-          height: 28,
-          marginTop: -28,
-          background: `linear-gradient(to bottom, transparent, ${colors.containerBg} 65%)`,
+          height: 26,
+          marginTop: -26,
+          background: `linear-gradient(to bottom, transparent, ${colors.containerBg} 70%)`,
           position: 'relative',
           zIndex: 2
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, minWidth: 0 }}>
           {isRunning && (
-            <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ display: 'flex', gap: 3 }}>
-                {[0, 150, 300].map((d) => (
+            <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+              <span style={{ display: 'flex', gap: 2.5 }}>
+                {[0, 130, 260].map((d) => (
                   <span
                     key={d}
                     className="animate-bounce-dot"
                     style={{
-                      width: 3,
-                      height: 3,
+                      width: 2.5,
+                      height: 2.5,
                       borderRadius: '50%',
                       background: colors.statusRunning,
                       animationDelay: `${d}ms`,
@@ -244,15 +240,19 @@ export function ConversationView() {
                   />
                 ))}
               </span>
-              <span style={{ color: colors.textSecondary, letterSpacing: '-0.01em' }}>
+              <span style={{ color: colors.textTertiary, fontSize: 11, letterSpacing: '-0.01em' }}>
                 {tab.currentActivity || 'Working…'}
               </span>
             </span>
           )}
-          {isDead && <span style={{ color: colors.statusError }}>Session ended</span>}
+          {isDead && (
+            <span style={{ fontSize: 11, color: colors.statusError, letterSpacing: '-0.01em' }}>
+              Session ended
+            </span>
+          )}
           {isFailed && (
-            <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ color: colors.statusError }}>Failed</span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+              <span style={{ fontSize: 11, color: colors.statusError }}>Failed</span>
               <button
                 onClick={handleRetry}
                 style={{
@@ -264,11 +264,11 @@ export function ConversationView() {
                   cursor: 'pointer',
                   background: 'none',
                   border: 'none',
-                  padding: 0
+                  padding: 0,
+                  letterSpacing: '-0.01em'
                 }}
               >
-                <ArrowCounterClockwiseIcon size={10} />
-                Retry
+                <ArrowCounterClockwiseIcon size={10} /> Retry
               </button>
             </span>
           )}
@@ -279,7 +279,7 @@ export function ConversationView() {
   )
 }
 
-// ─── Empty State ───
+// ─── Empty State ──────────────────────────────────────────────────────────────
 
 function EmptyState() {
   const setBaseDirectory = useSessionStore((s) => s.setBaseDirectory)
@@ -291,9 +291,9 @@ function EmptyState() {
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: '24px 16px',
-        gap: 10,
-        minHeight: 90
+        padding: '22px 16px',
+        gap: 8,
+        minHeight: 88
       }}
     >
       <button
@@ -304,16 +304,16 @@ function EmptyState() {
         style={{
           display: 'flex',
           alignItems: 'center',
-          gap: 6,
+          gap: 5,
           fontSize: 12,
-          padding: '7px 16px',
+          padding: '6px 14px',
           borderRadius: 9999,
           color: colors.accent,
           background: colors.accentLight,
           border: `1px solid ${colors.accentBorder}`,
           cursor: 'pointer',
-          transition: 'background 0.15s',
-          letterSpacing: '-0.01em'
+          transition: 'background 0.12s',
+          letterSpacing: '-0.012em'
         }}
         onMouseEnter={(e) =>
           ((e.currentTarget as HTMLElement).style.background = colors.accentSoft)
@@ -322,9 +322,9 @@ function EmptyState() {
           ((e.currentTarget as HTMLElement).style.background = colors.accentLight)
         }
       >
-        <FolderOpenIcon size={13} /> Choose folder
+        <FolderOpenIcon size={12} /> Choose folder
       </button>
-      <span style={{ fontSize: 11, color: colors.textTertiary }}>
+      <span style={{ fontSize: 10.5, color: colors.textTertiary, letterSpacing: '-0.01em' }}>
         Press <strong style={{ color: colors.textSecondary, fontWeight: 500 }}>⌥ Space</strong> to
         toggle
       </span>
@@ -332,7 +332,7 @@ function EmptyState() {
   )
 }
 
-// ─── Copy Button ───
+// ─── Copy Button ──────────────────────────────────────────────────────────────
 
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false)
@@ -356,78 +356,84 @@ function CopyButton({ text }: { text: string }) {
         alignItems: 'center',
         gap: 3,
         padding: '2px 6px',
-        borderRadius: 6,
-        fontSize: 10,
-        background: copied ? colors.statusCompleteBg : 'rgba(255,255,255,0.06)',
+        borderRadius: 5,
+        fontSize: 9.5,
+        background: copied ? colors.statusCompleteBg : 'rgba(255,255,255,0.05)',
         color: copied ? colors.statusComplete : colors.textTertiary,
-        border: `1px solid ${copied ? colors.statusCompleteBg : 'rgba(255,255,255,0.08)'}`,
+        border: `1px solid ${copied ? colors.statusCompleteBg : 'rgba(255,255,255,0.07)'}`,
         cursor: 'pointer',
-        transition: 'all 0.15s',
+        transition: 'all 0.12s',
         letterSpacing: '-0.01em'
       }}
     >
-      {copied ? <CheckIcon size={10} /> : <CopyIcon size={10} />}
+      {copied ? <CheckIcon size={9} /> : <CopyIcon size={9} />}
       {copied ? 'Copied' : 'Copy'}
     </motion.button>
   )
 }
 
-// ─── Interrupt Button ───
+// ─── Interrupt Button ─────────────────────────────────────────────────────────
 
-function InterruptButton({ tabId }: { tabId: string }) {
+function InterruptButton({ tabId }: { tabId: string }): React.ReactElement {
   const colors = useColors()
   return (
     <motion.button
-      initial={{ opacity: 0, scale: 0.88 }}
+      initial={{ opacity: 0, scale: 0.85 }}
       animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.88 }}
-      transition={{ duration: 0.12 }}
+      exit={{ opacity: 0, scale: 0.85 }}
+      transition={{ duration: 0.11 }}
       onClick={() => window.yald.stopTab(tabId)}
       style={{
         display: 'inline-flex',
         alignItems: 'center',
         gap: 4,
-        padding: '3px 8px',
+        padding: '2px 8px',
         borderRadius: 9999,
-        fontSize: 11,
+        fontSize: 10.5,
         cursor: 'pointer',
         color: colors.statusError,
         background: colors.statusErrorBg,
-        border: `1px solid rgba(224,112,112,0.2)`,
-        transition: 'background 0.15s',
+        border: `1px solid rgba(224,112,112,0.16)`,
+        transition: 'background 0.12s',
         letterSpacing: '-0.01em'
       }}
       onMouseEnter={(e) =>
-        ((e.currentTarget as HTMLElement).style.background = 'rgba(224,112,112,0.14)')
+        ((e.currentTarget as HTMLElement).style.background = 'rgba(224,112,112,0.12)')
       }
       onMouseLeave={(e) =>
         ((e.currentTarget as HTMLElement).style.background = colors.statusErrorBg)
       }
     >
-      <SquareIcon size={8} weight="fill" /> Interrupt
+      <SquareIcon size={7} weight="fill" /> Interrupt
     </motion.button>
   )
 }
 
-// ─── User Message ───
+// ─── User Message ─────────────────────────────────────────────────────────────
 
-function UserMessage({ message, skipMotion }: { message: Message; skipMotion?: boolean }) {
+function UserMessage({
+  message,
+  skipMotion
+}: {
+  message: Message
+  skipMotion?: boolean
+}): React.ReactElement {
   const colors = useColors()
   const content = (
-    <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '4px 0' }}>
+    <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '3px 0' }}>
       <div
         style={{
           fontSize: 13,
           lineHeight: 1.55,
-          padding: '8px 13px',
-          maxWidth: '82%',
+          padding: '8px 12px',
+          maxWidth: '80%',
           background: colors.userBubble,
           color: colors.userBubbleText,
           border: `1px solid ${colors.userBubbleBorder}`,
-          borderRadius: '14px 14px 4px 14px',
-          boxShadow: '0 1px 0 rgba(255,255,255,0.08) inset',
-          backdropFilter: 'blur(12px)',
-          letterSpacing: '-0.01em'
+          borderRadius: '13px 13px 3px 13px',
+          boxShadow: '0 1px 0 rgba(255,255,255,0.07) inset',
+          backdropFilter: 'blur(10px)',
+          letterSpacing: '-0.012em'
         }}
       >
         {message.content}
@@ -437,38 +443,38 @@ function UserMessage({ message, skipMotion }: { message: Message; skipMotion?: b
   if (skipMotion) return content
   return (
     <motion.div
-      initial={{ opacity: 0, y: 8, scale: 0.97 }}
+      initial={{ opacity: 0, y: 7, scale: 0.97 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={{ duration: 0.16, ease: [0.34, 1.2, 0.64, 1] }}
+      transition={{ duration: 0.15, ease: [0.22, 1, 0.36, 1] }}
     >
       {content}
     </motion.div>
   )
 }
 
-// ─── Queued Message ───
+// ─── Queued Message ───────────────────────────────────────────────────────────
 
-function QueuedMessage({ content }: { content: string }) {
+function QueuedMessage({ content }: { content: string }): React.ReactElement {
   const colors = useColors()
   return (
     <motion.div
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 0.5, y: 0 }}
+      initial={{ opacity: 0, y: 7 }}
+      animate={{ opacity: 0.45, y: 0 }}
       exit={{ opacity: 0, scale: 0.95 }}
-      transition={{ duration: 0.15 }}
-      style={{ display: 'flex', justifyContent: 'flex-end', padding: '4px 0' }}
+      transition={{ duration: 0.14 }}
+      style={{ display: 'flex', justifyContent: 'flex-end', padding: '3px 0' }}
     >
       <div
         style={{
           fontSize: 13,
           lineHeight: 1.55,
-          padding: '8px 13px',
-          maxWidth: '82%',
+          padding: '8px 12px',
+          maxWidth: '80%',
           background: colors.userBubble,
           color: colors.userBubbleText,
           border: `1px dashed ${colors.userBubbleBorder}`,
-          borderRadius: '14px 14px 4px 14px',
-          letterSpacing: '-0.01em'
+          borderRadius: '13px 13px 3px 13px',
+          letterSpacing: '-0.012em'
         }}
       >
         {content}
@@ -477,7 +483,7 @@ function QueuedMessage({ content }: { content: string }) {
   )
 }
 
-// ─── Table scroll wrapper ───
+// ─── Table scroll wrapper ─────────────────────────────────────────────────────
 
 function TableScrollWrapper({ children }: { children: React.ReactNode }) {
   const ref = useRef<HTMLDivElement>(null)
@@ -516,14 +522,15 @@ function TableScrollWrapper({ children }: { children: React.ReactNode }) {
     <div
       ref={ref}
       onScroll={update}
-      style={{ overflowX: 'auto', scrollbarWidth: 'thin', maskImage: fade, WebkitMaskImage: fade }}
+      className="hide-scrollbar"
+      style={{ overflowX: 'auto', maskImage: fade, WebkitMaskImage: fade }}
     >
       <table>{children}</table>
     </div>
   )
 }
 
-// ─── Image Card ───
+// ─── Image Card ───────────────────────────────────────────────────────────────
 
 function ImageCard({
   src,
@@ -542,11 +549,11 @@ function ImageCard({
         style={{
           display: 'inline-flex',
           alignItems: 'center',
-          gap: 6,
+          gap: 5,
           margin: '4px 0',
-          padding: '6px 10px',
-          borderRadius: 8,
-          fontSize: 12,
+          padding: '5px 9px',
+          borderRadius: 7,
+          fontSize: 11.5,
           cursor: 'pointer',
           background: colors.surfacePrimary,
           color: colors.accent,
@@ -554,8 +561,7 @@ function ImageCard({
         }}
         onClick={() => src && window.yald.openExternal(String(src))}
       >
-        <GlobeIcon size={12} />
-        Image unavailable{alt ? ` — ${alt}` : ''}
+        <GlobeIcon size={11} /> Image unavailable{alt ? ` — ${alt}` : ''}
       </button>
     )
   return (
@@ -563,8 +569,8 @@ function ImageCard({
       type="button"
       style={{
         display: 'block',
-        margin: '8px 0',
-        borderRadius: 10,
+        margin: '7px 0',
+        borderRadius: 9,
         overflow: 'hidden',
         border: `1px solid ${colors.toolBorder}`,
         background: colors.surfacePrimary,
@@ -575,18 +581,18 @@ function ImageCard({
       <img
         src={src}
         alt={alt || 'Image'}
-        style={{ display: 'block', width: '100%', maxHeight: 240, objectFit: 'cover' }}
+        style={{ display: 'block', width: '100%', maxHeight: 220, objectFit: 'cover' }}
         loading="lazy"
         onError={() => setFailed(true)}
       />
       {alt && (
-        <div style={{ padding: '4px 8px', fontSize: 11, color: colors.textTertiary }}>{alt}</div>
+        <div style={{ padding: '3px 8px', fontSize: 10.5, color: colors.textTertiary }}>{alt}</div>
       )}
     </button>
   )
 }
 
-// ─── Assistant Message ───
+// ─── Assistant Message ────────────────────────────────────────────────────────
 
 const AssistantMessage = React.memo(
   function AssistantMessage({ message, skipMotion }: { message: Message; skipMotion?: boolean }) {
@@ -621,7 +627,7 @@ const AssistantMessage = React.memo(
     )
 
     const inner = (
-      <div className="group/msg" style={{ position: 'relative', padding: '4px 0' }}>
+      <div className="group/msg" style={{ position: 'relative', padding: '3px 0' }}>
         <div
           className="prose-cloud"
           style={{
@@ -629,7 +635,7 @@ const AssistantMessage = React.memo(
             lineHeight: 1.65,
             minWidth: 0,
             maxWidth: '94%',
-            letterSpacing: '-0.01em'
+            letterSpacing: '-0.012em'
           }}
         >
           <Markdown remarkPlugins={REMARK_PLUGINS} components={markdownComponents}>
@@ -649,9 +655,9 @@ const AssistantMessage = React.memo(
     if (skipMotion) return inner
     return (
       <motion.div
-        initial={{ opacity: 0, y: 6 }}
+        initial={{ opacity: 0, y: 5 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.15 }}
+        transition={{ duration: 0.14 }}
       >
         {inner}
       </motion.div>
@@ -660,7 +666,7 @@ const AssistantMessage = React.memo(
   (p, n) => p.message.content === n.message.content && p.skipMotion === n.skipMotion
 )
 
-// ─── Tool Group ───
+// ─── Tool Group ───────────────────────────────────────────────────────────────
 
 function toolSummary(tools: Message[]): string {
   if (!tools.length) return ''
@@ -712,43 +718,41 @@ function ToolGroup({ tools, skipMotion }: { tools: Message[]; skipMotion?: boole
 
   if (isOpen) {
     const inner = (
-      <div style={{ padding: '4px 0' }}>
+      <div style={{ padding: '3px 0' }}>
         {!hasRunning && (
           <button
             onClick={() => setExpanded(false)}
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: 4,
-              marginBottom: 8,
+              gap: 3,
+              marginBottom: 7,
               cursor: 'pointer',
               background: 'none',
               border: 'none',
               padding: 0
             }}
           >
-            <CaretDownIcon size={9} style={{ color: colors.textTertiary }} />
-            <span style={{ fontSize: 10, color: colors.textTertiary, letterSpacing: '0.02em' }}>
-              {tools.length} tool{tools.length !== 1 ? 's' : ''} used
+            <CaretDownIcon size={8} style={{ color: colors.textTertiary }} />
+            <span style={{ fontSize: 10, color: colors.textTertiary, letterSpacing: '0.01em' }}>
+              {tools.length} tool{tools.length !== 1 ? 's' : ''}
             </span>
           </button>
         )}
 
         {/* Timeline */}
-        <div style={{ position: 'relative', paddingLeft: 22 }}>
-          {/* Vertical line */}
+        <div style={{ position: 'relative', paddingLeft: 20 }}>
           <div
             style={{
               position: 'absolute',
-              left: 8,
-              top: 4,
-              bottom: 4,
+              left: 7,
+              top: 3,
+              bottom: 3,
               width: 1,
               background: colors.timelineLine
             }}
           />
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
             {tools.map((tool) => {
               const isRun = tool.toolStatus === 'running'
               const name = tool.toolName || 'Tool'
@@ -759,17 +763,17 @@ function ToolGroup({ tools, skipMotion }: { tools: Message[]; skipMotion?: boole
                     position: 'relative',
                     display: 'flex',
                     alignItems: 'flex-start',
-                    gap: 8
+                    gap: 7
                   }}
                 >
                   {/* Node */}
                   <div
                     style={{
                       position: 'absolute',
-                      left: -22,
+                      left: -20,
                       top: 0,
-                      width: 18,
-                      height: 18,
+                      width: 16,
+                      height: 16,
                       borderRadius: '50%',
                       display: 'flex',
                       alignItems: 'center',
@@ -781,12 +785,12 @@ function ToolGroup({ tools, skipMotion }: { tools: Message[]; skipMotion?: boole
                   >
                     {isRun ? (
                       <SpinnerGapIcon
-                        size={9}
+                        size={8}
                         className="animate-spin"
                         style={{ color: colors.statusRunning }}
                       />
                     ) : (
-                      <ToolIcon name={name} size={9} />
+                      <ToolIcon name={name} size={8} />
                     )}
                   </div>
 
@@ -800,7 +804,7 @@ function ToolGroup({ tools, skipMotion }: { tools: Message[]; skipMotion?: boole
                         textOverflow: 'ellipsis',
                         whiteSpace: 'nowrap',
                         color: isRun ? colors.textSecondary : colors.textTertiary,
-                        letterSpacing: '-0.01em'
+                        letterSpacing: '-0.012em'
                       }}
                     >
                       {getToolDescription(name, tool.toolInput)}
@@ -812,11 +816,11 @@ function ToolGroup({ tools, skipMotion }: { tools: Message[]; skipMotion?: boole
                           fontSize: 9,
                           marginTop: 2,
                           padding: '1px 5px',
-                          borderRadius: 4,
+                          borderRadius: 3,
                           background:
                             tool.toolStatus === 'error'
                               ? colors.statusErrorBg
-                              : 'rgba(255,255,255,0.05)',
+                              : 'rgba(255,255,255,0.04)',
                           color:
                             tool.toolStatus === 'error' ? colors.statusError : colors.textTertiary
                         }}
@@ -838,7 +842,7 @@ function ToolGroup({ tools, skipMotion }: { tools: Message[]; skipMotion?: boole
         initial={{ opacity: 0, height: 0 }}
         animate={{ opacity: 1, height: 'auto' }}
         exit={{ opacity: 0, height: 0 }}
-        transition={{ duration: 0.15 }}
+        transition={{ duration: 0.14 }}
       >
         {inner}
       </motion.div>
@@ -852,49 +856,55 @@ function ToolGroup({ tools, skipMotion }: { tools: Message[]; skipMotion?: boole
         display: 'flex',
         alignItems: 'center',
         gap: 4,
-        padding: '3px 0',
+        padding: '2px 0',
         background: 'none',
         border: 'none',
         cursor: 'pointer'
       }}
     >
-      <CaretRightIcon size={9} style={{ color: colors.textTertiary, flexShrink: 0 }} />
-      <span style={{ fontSize: 11, color: colors.textTertiary, letterSpacing: '-0.01em' }}>
+      <CaretRightIcon size={8} style={{ color: colors.textTertiary, flexShrink: 0 }} />
+      <span style={{ fontSize: 10.5, color: colors.textTertiary, letterSpacing: '-0.012em' }}>
         {toolSummary(tools)}
       </span>
     </button>
   )
-  if (skipMotion) return <div style={{ padding: '2px 0' }}>{inner}</div>
+  if (skipMotion) return <div style={{ padding: '1px 0' }}>{inner}</div>
   return (
     <motion.div
-      initial={{ opacity: 0, y: 4 }}
+      initial={{ opacity: 0, y: 3 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.12 }}
-      style={{ padding: '2px 0' }}
+      transition={{ duration: 0.11 }}
+      style={{ padding: '1px 0' }}
     >
       {inner}
     </motion.div>
   )
 }
 
-// ─── System Message ───
+// ─── System Message ───────────────────────────────────────────────────────────
 
-function SystemMessage({ message, skipMotion }: { message: Message; skipMotion?: boolean }) {
+function SystemMessage({
+  message,
+  skipMotion
+}: {
+  message: Message
+  skipMotion?: boolean
+}): React.ReactElement {
   const isError = message.content.startsWith('Error:') || message.content.includes('unexpectedly')
   const colors = useColors()
   const inner = (
-    <div style={{ padding: '3px 0' }}>
+    <div style={{ padding: '2px 0' }}>
       <div
         style={{
           display: 'inline-block',
-          fontSize: 11,
+          fontSize: 10.5,
           lineHeight: 1.5,
-          padding: '4px 10px',
-          borderRadius: 8,
+          padding: '3px 9px',
+          borderRadius: 7,
           whiteSpace: 'pre-wrap',
-          background: isError ? colors.statusErrorBg : 'rgba(255,255,255,0.05)',
+          background: isError ? colors.statusErrorBg : 'rgba(255,255,255,0.04)',
           color: isError ? colors.statusError : colors.textTertiary,
-          border: `1px solid ${isError ? 'rgba(224,112,112,0.15)' : 'rgba(255,255,255,0.07)'}`
+          border: `1px solid ${isError ? 'rgba(224,112,112,0.12)' : 'rgba(255,255,255,0.06)'}`
         }}
       >
         {message.content}
@@ -903,15 +913,15 @@ function SystemMessage({ message, skipMotion }: { message: Message; skipMotion?:
   )
   if (skipMotion) return inner
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.15 }}>
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.14 }}>
       {inner}
     </motion.div>
   )
 }
 
-// ─── Tool Icon ───
+// ─── Tool Icon ────────────────────────────────────────────────────────────────
 
-function ToolIcon({ name, size = 12 }: { name: string; size?: number }) {
+function ToolIcon({ name, size = 11 }: { name: string; size?: number }): React.ReactElement {
   const colors = useColors()
   const ICONS: Record<string, React.ReactNode> = {
     LS: <FolderOpenIcon size={size} />,

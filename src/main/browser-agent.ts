@@ -6,6 +6,22 @@ interface BrowserConsoleEntry {
   message: string
 }
 
+// Electron 28+ passes a typed event object instead of positional args.
+// Define the shape here so we don't depend on a specific @electron/types version.
+interface ConsoleMessageEventParams {
+  level: number // 0=verbose, 1=info, 2=warning, 3=error
+  message: string
+  lineNumber: number
+  sourceId: string
+}
+
+const CONSOLE_LEVEL_MAP: Record<number, string> = {
+  0: 'verbose',
+  1: 'info',
+  2: 'warning',
+  3: 'error'
+}
+
 function log(message: string): void {
   _log('browser-agent', message)
 }
@@ -29,8 +45,15 @@ export class BrowserAgentManager {
       }
     })
 
-    this.window.webContents.on('console-message', (_event, level, message) => {
-      this.consoleBuffer.push({ level: String(level), message })
+    // Electron 28+ changed 'console-message' from positional args to a typed event object.
+    // The old overload is fully removed from the type definitions, so we attach the listener
+    // via the generic EventEmitter `.on(event, listener)` to avoid the TS overload error,
+    // then read the new event shape at runtime.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(this.window.webContents as any).on('console-message', (event: ConsoleMessageEventParams) => {
+      const level = CONSOLE_LEVEL_MAP[event.level] ?? String(event.level)
+      const message = event.message ?? ''
+      this.consoleBuffer.push({ level, message })
       if (this.consoleBuffer.length > 500) {
         this.consoleBuffer.shift()
       }
@@ -45,41 +68,36 @@ export class BrowserAgentManager {
   }
 
   async navigate(url: string): Promise<void> {
-    const window = this.ensureWindow()
+    const win = this.ensureWindow()
     log(`navigate ${url}`)
     await new Promise<void>((resolvePromise, rejectPromise) => {
       let idleTimer: NodeJS.Timeout | null = null
 
       const cleanup = (): void => {
         if (idleTimer) clearTimeout(idleTimer)
-        window.webContents.removeListener('did-finish-load', handleDidFinishLoad)
-        window.webContents.removeListener('did-stop-loading', handleLoading)
-        window.webContents.removeListener('did-start-loading', handleLoading)
+        win.webContents.removeListener('did-finish-load', onFinish)
+        win.webContents.removeListener('did-stop-loading', onLoading)
+        win.webContents.removeListener('did-start-loading', onLoading)
       }
 
       const scheduleIdleCheck = (): void => {
         if (idleTimer) clearTimeout(idleTimer)
         idleTimer = setTimeout(() => {
-          if (!window.webContents.isLoading() && !window.webContents.isWaitingForResponse()) {
+          if (!win.webContents.isLoading() && !win.webContents.isWaitingForResponse()) {
             cleanup()
             resolvePromise()
           }
         }, 500)
       }
 
-      const handleDidFinishLoad = (): void => {
-        scheduleIdleCheck()
-      }
+      const onFinish = (): void => scheduleIdleCheck()
+      const onLoading = (): void => scheduleIdleCheck()
 
-      const handleLoading = (): void => {
-        scheduleIdleCheck()
-      }
+      win.webContents.on('did-finish-load', onFinish)
+      win.webContents.on('did-stop-loading', onLoading)
+      win.webContents.on('did-start-loading', onLoading)
 
-      window.webContents.on('did-finish-load', handleDidFinishLoad)
-      window.webContents.on('did-stop-loading', handleLoading)
-      window.webContents.on('did-start-loading', handleLoading)
-
-      void window.loadURL(url).catch((error: unknown) => {
+      void win.loadURL(url).catch((error: unknown) => {
         cleanup()
         const message = error instanceof Error ? error.message : String(error)
         rejectPromise(new Error(`Navigation failed: ${message}`))
@@ -88,22 +106,21 @@ export class BrowserAgentManager {
   }
 
   async screenshot(): Promise<string> {
-    const window = this.ensureWindow()
-    const image = await window.webContents.capturePage()
+    const win = this.ensureWindow()
+    const image = await win.webContents.capturePage()
     return image.toPNG().toString('base64')
   }
 
   async click(selector: string): Promise<void> {
     const script = `
       (() => {
-        const element = document.querySelector(${JSON.stringify(selector)});
-        if (!(element instanceof HTMLElement)) {
-          throw new Error('Element not found for selector: ${selector}');
+        const el = document.querySelector(${JSON.stringify(selector)});
+        if (!(el instanceof HTMLElement)) {
+          throw new Error('Element not found: ' + ${JSON.stringify(selector)});
         }
-        element.click();
+        el.click();
       })();
     `
-
     try {
       await this.ensureWindow().webContents.executeJavaScript(script)
     } catch (error) {
@@ -115,25 +132,20 @@ export class BrowserAgentManager {
   async type(selector: string, text: string): Promise<void> {
     const script = `
       (() => {
-        const element = document.querySelector(${JSON.stringify(selector)});
-        if (!(element instanceof HTMLInputElement) &&
-            !(element instanceof HTMLTextAreaElement) &&
-            !(element instanceof HTMLElement)) {
-          throw new Error('Element not found for selector: ${selector}');
+        const el = document.querySelector(${JSON.stringify(selector)});
+        if (!(el instanceof HTMLElement)) {
+          throw new Error('Element not found: ' + ${JSON.stringify(selector)});
         }
-        if ('focus' in element) {
-          element.focus();
-        }
-        if ('value' in element) {
-          element.value = ${JSON.stringify(text)};
+        el.focus();
+        if ('value' in el) {
+          el.value = ${JSON.stringify(text)};
         } else {
-          element.textContent = ${JSON.stringify(text)};
+          el.textContent = ${JSON.stringify(text)};
         }
-        element.dispatchEvent(new Event('input', { bubbles: true }));
-        element.dispatchEvent(new Event('change', { bubbles: true }));
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+        el.dispatchEvent(new Event('change', { bubbles: true }));
       })();
     `
-
     try {
       await this.ensureWindow().webContents.executeJavaScript(script)
     } catch (error) {
@@ -145,11 +157,10 @@ export class BrowserAgentManager {
   async readDom(selector: string): Promise<string> {
     const script = `
       (() => {
-        const element = document.querySelector(${JSON.stringify(selector)});
-        return element instanceof HTMLElement ? element.outerHTML : '';
+        const el = document.querySelector(${JSON.stringify(selector)});
+        return el instanceof HTMLElement ? el.outerHTML : '';
       })();
     `
-
     try {
       const result = await this.ensureWindow().webContents.executeJavaScript(script)
       return typeof result === 'string' ? result : ''
@@ -171,7 +182,6 @@ export class BrowserAgentManager {
       this.consoleBuffer = []
       return
     }
-
     const target = this.window
     this.window = null
     this.consoleBuffer = []

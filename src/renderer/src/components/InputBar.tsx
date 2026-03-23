@@ -3,14 +3,11 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { MicrophoneIcon, ArrowUpIcon, SpinnerGapIcon, XIcon } from '@phosphor-icons/react'
 import { resolveProviderContext, useSessionStore } from '../stores/sessionStore'
 import { AttachmentChips } from './AttachmentChips'
-import {
-  SlashCommandMenu,
-  getFilteredCommandsWithExtras,
-  type SlashCommand
-} from './SlashCommandMenu'
+import { SlashCommandMenu } from './SlashCommandMenu'
 import { AVAILABLE_MODELS } from '../lib/llm'
 import { useColors } from '../lib/theme'
 import { useRealtimeVoice } from '../hooks/useRealtimeVoice'
+import { getFilteredCommandsWithExtras, type SlashCommand } from '../lib/slash-commands'
 
 const INPUT_MIN_HEIGHT = 20
 const INPUT_MAX_HEIGHT = 140
@@ -22,47 +19,47 @@ const BASE_COMMANDS: SlashCommand[] = [
   {
     command: '/clear',
     description: 'Clear conversation history',
-    icon: <span className="text-[11px]">x</span>
+    icon: <span style={{ fontSize: 10 }}>✕</span>
   },
   {
     command: '/cost',
     description: 'Show token and duration info',
-    icon: <span className="text-[11px]">x</span>
+    icon: <span style={{ fontSize: 10 }}>$</span>
   },
   {
     command: '/skills',
     description: 'Show installed agent skills',
-    icon: <span className="text-[11px]">x</span>
+    icon: <span style={{ fontSize: 10 }}>✦</span>
   },
   {
     command: '/model',
     description: 'Show or switch Ollama model',
-    icon: <span className="text-[11px]">x</span>
+    icon: <span style={{ fontSize: 10 }}>⌘</span>
   },
   {
     command: '/orchestrator',
     description: 'Toggle specialist orchestrator mode',
-    icon: <span className="text-[11px]">x</span>
+    icon: <span style={{ fontSize: 10 }}>◎</span>
   },
   {
     command: '/vibe',
     description: 'Run the vibe code pipeline',
-    icon: <span className="text-[11px]">x</span>
+    icon: <span style={{ fontSize: 10 }}>⚡</span>
   },
   {
     command: '/sandbox',
     description: 'Inspect or stop the active sandbox',
-    icon: <span className="text-[11px]">x</span>
+    icon: <span style={{ fontSize: 10 }}>□</span>
   },
   {
     command: '/pipeline',
     description: 'Inspect the current pipeline log',
-    icon: <span className="text-[11px]">x</span>
+    icon: <span style={{ fontSize: 10 }}>▸</span>
   },
   {
     command: '/help',
     description: 'Show available commands',
-    icon: <span className="text-[11px]">x</span>
+    icon: <span style={{ fontSize: 10 }}>?</span>
   }
 ]
 
@@ -119,14 +116,12 @@ export function InputBar() {
   useEffect(() => {
     textareaRef.current?.focus()
   }, [activeTabId])
-
   useEffect(() => {
     const unsub = window.yald.onWindowShown(() => {
       textareaRef.current?.focus()
     })
     return unsub
   }, [])
-
   useEffect(() => {
     if (voiceShortcutNonce === 0) return
     clearVoiceError()
@@ -139,41 +134,42 @@ export function InputBar() {
       const measure = document.createElement('textarea')
       measure.setAttribute('aria-hidden', 'true')
       measure.tabIndex = -1
-      measure.style.position = 'absolute'
-      measure.style.top = '-99999px'
-      measure.style.left = '0'
-      measure.style.height = '0'
-      measure.style.minHeight = '0'
-      measure.style.overflow = 'hidden'
-      measure.style.visibility = 'hidden'
-      measure.style.pointerEvents = 'none'
-      measure.style.zIndex = '-1'
-      measure.style.resize = 'none'
-      measure.style.border = '0'
-      measure.style.outline = '0'
-      measure.style.boxSizing = 'border-box'
+      Object.assign(measure.style, {
+        position: 'absolute',
+        top: '-99999px',
+        left: '0',
+        height: '0',
+        minHeight: '0',
+        overflow: 'hidden',
+        visibility: 'hidden',
+        pointerEvents: 'none',
+        zIndex: '-1',
+        resize: 'none',
+        border: '0',
+        outline: '0',
+        boxSizing: 'border-box'
+      })
       document.body.appendChild(measure)
       measureRef.current = measure
     }
-
     const measure = measureRef.current
     const hostWidth = wrapperRef.current?.clientWidth ?? 0
     const inlineWidth = Math.max(120, hostWidth - INLINE_CONTROLS_RESERVED_WIDTH)
-    measure.style.width = `${inlineWidth}px`
-    measure.style.fontSize = '14px'
-    measure.style.lineHeight = '20px'
-    measure.style.paddingTop = '15px'
-    measure.style.paddingBottom = '15px'
-    measure.style.paddingLeft = '0'
-    measure.style.paddingRight = '0'
-
+    Object.assign(measure.style, {
+      width: `${inlineWidth}px`,
+      fontSize: '13.5px',
+      lineHeight: '20px',
+      paddingTop: '15px',
+      paddingBottom: '15px',
+      paddingLeft: '0',
+      paddingRight: '0'
+    })
     const computed = textareaRef.current ? window.getComputedStyle(textareaRef.current) : null
     if (computed) {
       measure.style.fontFamily = computed.fontFamily
       measure.style.letterSpacing = computed.letterSpacing
       measure.style.fontWeight = computed.fontWeight
     }
-
     measure.value = value || ' '
     return measure.scrollHeight
   }, [])
@@ -196,7 +192,6 @@ export function InputBar() {
   useLayoutEffect(() => {
     autoResize()
   }, [autoResize, input, isMultiLine])
-
   useEffect(() => {
     return () => {
       if (measureRef.current) {
@@ -225,18 +220,19 @@ export function InputBar() {
           break
         case '/cost': {
           if (tab?.lastResult) {
-            const result = tab.lastResult
-            const parts = [
-              `$${result.totalCostUsd.toFixed(4)}`,
-              `${(result.durationMs / 1000).toFixed(1)}s`,
-              `${result.numTurns} turn${result.numTurns !== 1 ? 's' : ''}`
-            ]
-            if (result.usage.input_tokens) {
-              parts.push(
-                `${result.usage.input_tokens.toLocaleString()} in / ${(result.usage.output_tokens || 0).toLocaleString()} out`
-              )
-            }
-            addSystemMessage(parts.join(' · '))
+            const r = tab.lastResult
+            addSystemMessage(
+              [
+                `$${r.totalCostUsd.toFixed(4)}`,
+                `${(r.durationMs / 1000).toFixed(1)}s`,
+                `${r.numTurns} turn${r.numTurns !== 1 ? 's' : ''}`,
+                ...(r.usage.input_tokens
+                  ? [
+                      `${r.usage.input_tokens.toLocaleString()} in / ${(r.usage.output_tokens || 0).toLocaleString()} out`
+                    ]
+                  : [])
+              ].join(' · ')
+            )
           } else {
             addSystemMessage('No run data yet. Send a message first.')
           }
@@ -245,30 +241,22 @@ export function InputBar() {
         case '/model': {
           const current =
             preferredModel || tab?.sessionModel || AVAILABLE_MODELS[0]?.id || 'unknown'
-          const lines = AVAILABLE_MODELS.map((model) => {
-            const active = model.id === current
-            return `  ${active ? '●' : '○'} ${model.label} (${model.id})`
-          })
           addSystemMessage(
-            `Ollama Cloud models\n\n${lines.join('\n')}\n\nSwitch model: type /model <name>`
+            `Ollama Cloud models\n\n${AVAILABLE_MODELS.map((m) => `  ${m.id === current ? '●' : '○'} ${m.label} (${m.id})`).join('\n')}\n\nSwitch: /model <n>`
           )
           break
         }
         case '/skills':
-          if (installedSkills.length === 0) {
-            addSystemMessage(
-              'No agent skills installed yet. Open the Skills Marketplace to install one.'
-            )
-          } else {
-            addSystemMessage(
-              `Installed agent skills\n\n${installedSkills.map((skill) => `- ${skill.name}: ${skill.description}`).join('\n')}`
-            )
-          }
+          addSystemMessage(
+            installedSkills.length === 0
+              ? 'No skills installed. Open Skills to install one.'
+              : `Installed skills\n\n${installedSkills.map((s) => `- ${s.name}: ${s.description}`).join('\n')}`
+          )
           break
         case '/orchestrator':
           addSystemMessage(
             orchestratorContext
-              ? `Orchestrator ${orchestratorEnabled ? 'enabled' : 'disabled'}\n\nintent: ${orchestratorContext.intent}\nconfidence: ${orchestratorContext.confidence}\nsubtasks: ${orchestratorContext.plan.subtasks.length}\nskill gaps: ${orchestratorContext.skill_gaps.length || 0}`
+              ? `Orchestrator ${orchestratorEnabled ? 'enabled' : 'disabled'}\n\nintent: ${orchestratorContext.intent}\nconfidence: ${orchestratorContext.confidence}\nsubtasks: ${orchestratorContext.plan.subtasks.length}`
               : `Orchestrator ${orchestratorEnabled ? 'enabled' : 'disabled'}`
           )
           break
@@ -283,13 +271,7 @@ export function InputBar() {
           break
         case '/help':
           addSystemMessage(
-            [
-              '/clear — Clear conversation history',
-              '/cost — Show token usage and duration',
-              '/skills — Show installed marketplace skills',
-              '/model — Show model info or switch model',
-              '/help — Show this list'
-            ].join('\n')
+            BASE_COMMANDS.map((command) => `${command.command} — ${command.description}`).join('\n')
           )
           break
       }
@@ -323,24 +305,23 @@ export function InputBar() {
         return
       }
     }
-
     const prompt = input.trim()
     const modelMatch = prompt.match(/^\/model\s+(\S+)/i)
     const orchestratorMatch = prompt.match(/^\/orchestrator(?:\s+(on|off|status))?$/i)
     const vibeMatch = prompt.match(/^\/vibe(?:\s+([\s\S]+))?$/i)
     const sandboxMatch = prompt.match(/^\/sandbox(?:\s+(status|stop))?$/i)
     const pipelineMatch = prompt.match(/^\/pipeline(?:\s+(log))?$/i)
+
     if (modelMatch) {
-      const query = modelMatch[1].toLowerCase()
+      const q = modelMatch[1].toLowerCase()
       const match = AVAILABLE_MODELS.find(
-        (model) =>
-          model.id.toLowerCase().includes(query) || model.label.toLowerCase().includes(query)
+        (m) => m.id.toLowerCase().includes(q) || m.label.toLowerCase().includes(q)
       )
       setInput('')
       setSlashFilter(null)
       if (match) {
         setPreferredModel(match.id)
-        addSystemMessage(`Model switched to ${match.label} (${match.id})`)
+        addSystemMessage(`Model switched to ${match.label}`)
       } else {
         addSystemMessage(`Unknown model "${modelMatch[1]}".`)
       }
@@ -352,17 +333,11 @@ export function InputBar() {
       setSlashFilter(null)
       if (action === 'on') {
         setOrchestratorEnabled(true)
-        addSystemMessage('Specialist orchestrator enabled for this tab.')
+        addSystemMessage('Orchestrator enabled.')
       } else if (action === 'off') {
         setOrchestratorEnabled(false)
-        addSystemMessage('Specialist orchestrator disabled for this tab.')
-      } else {
-        executeCommand({
-          command: '/orchestrator',
-          description: 'Show orchestrator mode status',
-          icon: <span className="text-[11px]">x</span>
-        })
-      }
+        addSystemMessage('Orchestrator disabled.')
+      } else executeCommand({ command: '/orchestrator', description: '', icon: null })
       return
     }
     if (vibeMatch) {
@@ -370,11 +345,7 @@ export function InputBar() {
       setInput('')
       setSlashFilter(null)
       if (!vibePrompt) {
-        executeCommand({
-          command: '/vibe',
-          description: 'Run the vibe code pipeline',
-          icon: <span className="text-[11px]">x</span>
-        })
+        executeCommand({ command: '/vibe', description: '', icon: null })
         return
       }
       await startVibePipeline(vibePrompt)
@@ -386,33 +357,25 @@ export function InputBar() {
       setSlashFilter(null)
       if (action === 'stop') {
         await stopVibePipeline()
-        addSystemMessage('Sandbox stopped for this tab.')
+        addSystemMessage('Sandbox stopped.')
         return
       }
-
       if (!pipelineState?.sandboxId) {
-        addSystemMessage('No active sandbox for this tab.')
+        addSystemMessage('No active sandbox.')
         return
       }
-
       let resourceLine = 'resource usage unavailable'
       try {
         const logs = await window.yald.sandboxGetLogs(pipelineState.sandboxId)
-        const resourceMatches = [...logs.matchAll(/\[resource\]\s+rss=(\d+)/g)]
-        const lastMatch = resourceMatches.at(-1)
-        if (lastMatch?.[1]) {
-          const rssBytes = Number(lastMatch[1])
-          const rssMb = rssBytes / (1024 * 1024)
-          resourceLine = `rss ${rssMb.toFixed(1)} MB`
-        }
+        const m = [...logs.matchAll(/\[resource\]\s+rss=(\d+)/g)].at(-1)
+        if (m?.[1]) resourceLine = `rss ${(Number(m[1]) / (1024 * 1024)).toFixed(1)} MB`
       } catch {}
-
       addSystemMessage(
         [
           `sandbox id: ${pipelineState.sandboxId}`,
           `status: ${pipelineState.error ? 'failed' : pipelineState.sandboxUrl ? 'running' : 'provisioning'}`,
           `url: ${pipelineState.sandboxUrl || 'not exposed yet'}`,
-          `resource usage: ${resourceLine}`
+          `resource: ${resourceLine}`
         ].join('\n')
       )
       return
@@ -420,17 +383,15 @@ export function InputBar() {
     if (pipelineMatch) {
       setInput('')
       setSlashFilter(null)
-      if (!pipelineState || pipelineState.log.length === 0) {
-        addSystemMessage('No pipeline log available for this tab.')
-        return
-      }
-      addSystemMessage(`Pipeline log\n\n${pipelineState.log.join('\n')}`)
+      addSystemMessage(
+        !pipelineState || pipelineState.log.length === 0
+          ? 'No pipeline log.'
+          : `Pipeline log\n\n${pipelineState.log.join('\n')}`
+      )
       return
     }
-
     if (!prompt && attachments.length === 0) return
     if (isConnecting) return
-
     setInput('')
     setSlashFilter(null)
     if (textareaRef.current) textareaRef.current.style.height = `${INPUT_MIN_HEIGHT}px`
@@ -458,12 +419,12 @@ export function InputBar() {
       const filtered = getFilteredCommandsWithExtras(slashFilter || '', BASE_COMMANDS)
       if (event.key === 'ArrowDown' && filtered.length > 0) {
         event.preventDefault()
-        setSlashIndex((index) => (index + 1) % filtered.length)
+        setSlashIndex((i) => (i + 1) % filtered.length)
         return
       }
       if (event.key === 'ArrowUp' && filtered.length > 0) {
         event.preventDefault()
-        setSlashIndex((index) => (index - 1 + filtered.length) % filtered.length)
+        setSlashIndex((i) => (i - 1 + filtered.length) % filtered.length)
         return
       }
       if (event.key === 'Tab') {
@@ -477,14 +438,11 @@ export function InputBar() {
         return
       }
     }
-
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault()
       handleSend()
     }
-    if (event.key === 'Escape' && !showSlashMenu) {
-      window.yald.hideWindow()
-    }
+    if (event.key === 'Escape' && !showSlashMenu) window.yald.hideWindow()
   }
 
   const handleInputChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -517,18 +475,31 @@ export function InputBar() {
   )
 
   const placeholder = isConnecting
-    ? 'Connecting to backend...'
+    ? 'Connecting…'
     : voice.isActive && voice.voiceState === 'listening'
-      ? 'Listening... speak naturally'
+      ? 'Listening…'
       : voice.isActive && voice.voiceState === 'transcribing'
-        ? 'Transcribing...'
+        ? 'Transcribing…'
         : voice.isActive && voice.voiceState === 'thinking'
-          ? 'Thinking...'
+          ? 'Thinking…'
           : voice.isActive && voice.voiceState === 'speaking'
-            ? 'Speaking... interrupt anytime'
+            ? 'Speaking… interrupt anytime'
             : isBusy
-              ? 'Type to queue a message...'
-              : 'Ask anything...'
+              ? 'Queue a message…'
+              : 'Ask anything…'
+
+  // ─── Shared button styles ───
+  const actionBtnStyle = {
+    width: 34,
+    height: 34,
+    borderRadius: '50%',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    border: 'none',
+    cursor: 'pointer',
+    transition: 'background 0.12s, color 0.12s'
+  } as const
 
   return (
     <div ref={wrapperRef} data-yald-ui className="flex flex-col w-full relative">
@@ -545,7 +516,7 @@ export function InputBar() {
       </AnimatePresence>
 
       {attachments.length > 0 && (
-        <div style={{ paddingTop: 6, marginLeft: -6 }}>
+        <div style={{ paddingTop: 6, marginLeft: -4 }}>
           <AttachmentChips attachments={attachments} onRemove={removeAttachment} />
         </div>
       )}
@@ -563,20 +534,17 @@ export function InputBar() {
               rows={1}
               className="w-full bg-transparent resize-none"
               style={{
-                fontSize: 14,
+                fontSize: 13.5,
                 lineHeight: '20px',
                 color: colors.textPrimary,
                 minHeight: 20,
                 maxHeight: INPUT_MAX_HEIGHT,
                 paddingTop: 11,
-                paddingBottom: 2
+                paddingBottom: 2,
+                letterSpacing: '-0.012em'
               }}
             />
-
-            <div
-              className="flex items-center justify-end gap-1"
-              style={{ marginTop: 0, paddingBottom: 4 }}
-            >
+            <div className="flex items-center justify-end gap-1" style={{ paddingBottom: 6 }}>
               <VoiceButtons
                 isActive={voice.isActive}
                 voiceState={voice.voiceState}
@@ -591,19 +559,28 @@ export function InputBar() {
                 {canSend && !voice.isActive && (
                   <motion.div
                     key="send"
-                    initial={{ opacity: 0, scale: 0.8 }}
+                    initial={{ opacity: 0, scale: 0.75 }}
                     animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.8 }}
+                    exit={{ opacity: 0, scale: 0.75 }}
                     transition={{ duration: 0.1 }}
                   >
                     <button
-                      onMouseDown={(event) => event.preventDefault()}
+                      onMouseDown={(e) => e.preventDefault()}
                       onClick={handleSend}
-                      className="w-9 h-9 rounded-full flex items-center justify-center transition-colors"
-                      style={{ background: colors.sendBg, color: colors.textOnAccent }}
+                      style={{
+                        ...actionBtnStyle,
+                        background: colors.sendBg,
+                        color: colors.textOnAccent
+                      }}
                       title={isBusy ? 'Queue message' : 'Send (Enter)'}
+                      onMouseEnter={(e) => {
+                        ;(e.currentTarget as HTMLElement).style.background = colors.sendHover
+                      }}
+                      onMouseLeave={(e) => {
+                        ;(e.currentTarget as HTMLElement).style.background = colors.sendBg
+                      }}
                     >
-                      <ArrowUpIcon size={16} weight="bold" />
+                      <ArrowUpIcon size={15} weight="bold" />
                     </button>
                   </motion.div>
                 )}
@@ -622,17 +599,17 @@ export function InputBar() {
               rows={1}
               className="flex-1 bg-transparent resize-none"
               style={{
-                fontSize: 14,
+                fontSize: 13.5,
                 lineHeight: '20px',
                 color: colors.textPrimary,
                 minHeight: 20,
                 maxHeight: INPUT_MAX_HEIGHT,
                 paddingTop: 15,
-                paddingBottom: 15
+                paddingBottom: 15,
+                letterSpacing: '-0.012em'
               }}
             />
-
-            <div className="flex items-center gap-1 shrink-0 ml-2">
+            <div className="flex items-center gap-1 shrink-0 ml-1.5">
               <VoiceButtons
                 isActive={voice.isActive}
                 voiceState={voice.voiceState}
@@ -647,19 +624,28 @@ export function InputBar() {
                 {canSend && !voice.isActive && (
                   <motion.div
                     key="send"
-                    initial={{ opacity: 0, scale: 0.8 }}
+                    initial={{ opacity: 0, scale: 0.75 }}
                     animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.8 }}
+                    exit={{ opacity: 0, scale: 0.75 }}
                     transition={{ duration: 0.1 }}
                   >
                     <button
-                      onMouseDown={(event) => event.preventDefault()}
+                      onMouseDown={(e) => e.preventDefault()}
                       onClick={handleSend}
-                      className="w-9 h-9 rounded-full flex items-center justify-center transition-colors"
-                      style={{ background: colors.sendBg, color: colors.textOnAccent }}
+                      style={{
+                        ...actionBtnStyle,
+                        background: colors.sendBg,
+                        color: colors.textOnAccent
+                      }}
                       title={isBusy ? 'Queue message' : 'Send (Enter)'}
+                      onMouseEnter={(e) => {
+                        ;(e.currentTarget as HTMLElement).style.background = colors.sendHover
+                      }}
+                      onMouseLeave={(e) => {
+                        ;(e.currentTarget as HTMLElement).style.background = colors.sendBg
+                      }}
                     >
-                      <ArrowUpIcon size={16} weight="bold" />
+                      <ArrowUpIcon size={15} weight="bold" />
                     </button>
                   </motion.div>
                 )}
@@ -670,13 +656,22 @@ export function InputBar() {
       </div>
 
       {voice.voiceError && (
-        <div className="px-1 pb-2 text-[11px]" style={{ color: colors.statusError }}>
+        <div
+          style={{
+            padding: '0 2px 8px',
+            fontSize: 10.5,
+            color: colors.statusError,
+            letterSpacing: '-0.01em'
+          }}
+        >
           {voice.voiceError}
         </div>
       )}
     </div>
   )
 }
+
+// ─── VoiceButtons ─────────────────────────────────────────────────────────────
 
 function VoiceButtons({
   isActive,
@@ -691,30 +686,42 @@ function VoiceButtons({
   colors: ReturnType<typeof useColors>
   onToggle: () => void
 }) {
+  const btnBase = {
+    width: 34,
+    height: 34,
+    borderRadius: '50%',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    border: 'none',
+    cursor: 'pointer',
+    transition: 'background 0.12s, color 0.12s'
+  } as const
+
   if (isActive) {
     const isWorking = voiceState === 'transcribing' || voiceState === 'thinking'
     return (
       <motion.div
         key="voice-live"
-        initial={{ opacity: 0, scale: 0.8 }}
+        initial={{ opacity: 0, scale: 0.75 }}
         animate={{ opacity: 1, scale: 1 }}
-        exit={{ opacity: 0, scale: 0.8 }}
+        exit={{ opacity: 0, scale: 0.75 }}
         transition={{ duration: 0.1 }}
       >
         <button
-          onMouseDown={(event) => event.preventDefault()}
+          onMouseDown={(e) => e.preventDefault()}
           onClick={onToggle}
-          className="w-9 h-9 rounded-full flex items-center justify-center transition-colors"
           style={{
+            ...btnBase,
             background: isWorking ? colors.micBg : colors.statusErrorBg,
             color: isWorking ? colors.micColor : colors.statusError
           }}
-          title="Stop voice interaction"
+          title="Stop voice"
         >
           {isWorking ? (
-            <SpinnerGapIcon size={16} className="animate-spin" />
+            <SpinnerGapIcon size={15} className="animate-spin" />
           ) : (
-            <XIcon size={15} weight="bold" />
+            <XIcon size={14} weight="bold" />
           )}
         </button>
       </motion.div>
@@ -724,23 +731,30 @@ function VoiceButtons({
   return (
     <motion.div
       key="voice-idle"
-      initial={{ opacity: 0, scale: 0.8 }}
+      initial={{ opacity: 0, scale: 0.75 }}
       animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.8 }}
+      exit={{ opacity: 0, scale: 0.75 }}
       transition={{ duration: 0.1 }}
     >
       <button
-        onMouseDown={(event) => event.preventDefault()}
+        onMouseDown={(e) => e.preventDefault()}
         onClick={onToggle}
         disabled={isConnecting}
-        className="w-9 h-9 rounded-full flex items-center justify-center transition-colors"
         style={{
+          ...btnBase,
           background: colors.micBg,
           color: isConnecting ? colors.micDisabled : colors.micColor
         }}
+        onMouseEnter={(e) => {
+          if (!isConnecting)
+            (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.09)'
+        }}
+        onMouseLeave={(e) => {
+          ;(e.currentTarget as HTMLElement).style.background = colors.micBg
+        }}
         title="Start realtime voice"
       >
-        <MicrophoneIcon size={16} />
+        <MicrophoneIcon size={15} />
       </button>
     </motion.div>
   )

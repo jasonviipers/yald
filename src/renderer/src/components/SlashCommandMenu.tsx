@@ -1,41 +1,9 @@
-import React, { useEffect, useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { motion } from 'framer-motion'
-import {
-  SparkleIcon,
-  CurrencyDollarIcon,
-  TrashIcon,
-  CpuIcon,
-  QuestionIcon
-} from '@phosphor-icons/react'
 import { usePopoverLayer } from './PopoverLayer'
 import { useColors } from '../lib/theme'
-
-export interface SlashCommand {
-  command: string
-  description: string
-  icon: React.ReactNode
-}
-
-export const SLASH_COMMANDS: SlashCommand[] = [
-  { command: '/clear', description: 'Clear conversation', icon: <TrashIcon size={12} /> },
-  { command: '/cost', description: 'Show usage & cost', icon: <CurrencyDollarIcon size={12} /> },
-  { command: '/skills', description: 'Available skills', icon: <SparkleIcon size={12} /> },
-  { command: '/model', description: 'Switch model', icon: <CpuIcon size={12} /> },
-  { command: '/help', description: 'Show all commands', icon: <QuestionIcon size={12} /> }
-]
-
-export function getFilteredCommands(f: string) {
-  return getFilteredCommandsWithExtras(f, [])
-}
-export function getFilteredCommandsWithExtras(f: string, extra: SlashCommand[]): SlashCommand[] {
-  const q = f.toLowerCase()
-  const merged = [...SLASH_COMMANDS]
-  for (const cmd of extra) {
-    if (!merged.some((c) => c.command === cmd.command)) merged.push(cmd)
-  }
-  return merged.filter((c) => c.command.startsWith(q))
-}
+import { getFilteredCommandsWithExtras, type SlashCommand } from '../lib/slash-commands'
 
 export function SlashCommandMenu({
   filter,
@@ -65,37 +33,62 @@ export function SlashCommandMenu({
   return createPortal(
     <motion.div
       data-yald-ui
-      initial={{ opacity: 0, y: 6, scale: 0.97 }}
+      initial={{ opacity: 0, y: 5, scale: 0.97 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, y: 4, scale: 0.97 }}
-      transition={{ duration: 0.14, ease: [0.34, 1.2, 0.64, 1] }}
+      exit={{ opacity: 0, y: 3, scale: 0.97 }}
+      transition={{ duration: 0.13, ease: [0.22, 1, 0.36, 1] }}
       style={{
         position: 'fixed',
-        bottom: window.innerHeight - anchorRect.top + 6,
-        left: anchorRect.left + 8,
-        right: window.innerWidth - anchorRect.right + 8,
+        bottom: window.innerHeight - anchorRect.top + 8,
+        left: anchorRect.left + 6,
+        right: window.innerWidth - anchorRect.right + 6,
         pointerEvents: 'auto',
-        borderRadius: 14,
+        borderRadius: 12,
         overflow: 'hidden',
         background: colors.popoverBg,
-        backdropFilter: 'blur(40px) saturate(200%)',
-        WebkitBackdropFilter: 'blur(40px) saturate(200%)',
-        boxShadow: `${colors.popoverShadow}, 0 1px 0 rgba(255,255,255,0.1) inset`,
+        backdropFilter: 'blur(40px) saturate(210%)',
+        WebkitBackdropFilter: 'blur(40px) saturate(210%)',
+        boxShadow: `${colors.popoverShadow}, 0 1px 0 rgba(255,255,255,0.09) inset`,
         border: `1px solid ${colors.popoverBorder}`
       }}
     >
-      <div ref={listRef} style={{ padding: '4px', maxHeight: 220, overflowY: 'auto' }}>
+      {/* Header label */}
+      <div
+        style={{
+          padding: '8px 10px 4px',
+          fontSize: 10,
+          color: colors.textTertiary,
+          letterSpacing: '0.06em',
+          textTransform: 'uppercase',
+          borderBottom: `1px solid rgba(255,255,255,0.05)`
+        }}
+      >
+        Commands
+      </div>
+
+      <div
+        ref={listRef}
+        className="hide-scrollbar"
+        style={{ padding: '4px', maxHeight: 200, overflowY: 'auto' }}
+      >
         {filtered.map((cmd, i) => {
           const isSel = i === selectedIndex
           return (
             <button
               key={cmd.command}
               onClick={() => onSelect(cmd)}
-              className="w-full flex items-center gap-2.5 rounded-lg transition-all"
               style={{
-                padding: '7px 10px',
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 9,
+                padding: '6px 8px',
+                borderRadius: 7,
                 background: isSel ? colors.accentLight : 'transparent',
-                textAlign: 'left'
+                border: 'none',
+                cursor: 'pointer',
+                textAlign: 'left',
+                transition: 'background 0.1s'
               }}
               onMouseEnter={(e) =>
                 ((e.currentTarget as HTMLElement).style.background = colors.accentLight)
@@ -104,29 +97,39 @@ export function SlashCommandMenu({
                 if (!isSel) (e.currentTarget as HTMLElement).style.background = 'transparent'
               }}
             >
+              {/* Icon badge */}
               <span
-                className="flex items-center justify-center rounded-md flex-shrink-0"
                 style={{
-                  width: 24,
-                  height: 24,
-                  background: isSel ? colors.accentSoft : 'rgba(255,255,255,0.06)',
+                  width: 22,
+                  height: 22,
+                  borderRadius: 6,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                  background: isSel ? colors.accentSoft : 'rgba(255,255,255,0.05)',
                   color: isSel ? colors.accent : colors.textTertiary
                 }}
               >
                 {cmd.icon}
               </span>
-              <div style={{ minWidth: 0, flex: 1 }}>
+
+              {/* Text */}
+              <div
+                style={{ minWidth: 0, flex: 1, display: 'flex', alignItems: 'baseline', gap: 7 }}
+              >
                 <span
                   style={{
                     fontSize: 12,
-                    fontFamily: 'monospace',
+                    fontFamily: 'ui-monospace, monospace',
                     fontWeight: 500,
-                    color: isSel ? colors.accent : colors.textPrimary
+                    color: isSel ? colors.accent : colors.textPrimary,
+                    letterSpacing: '-0.01em'
                   }}
                 >
                   {cmd.command}
                 </span>
-                <span style={{ fontSize: 11, marginLeft: 8, color: colors.textTertiary }}>
+                <span style={{ fontSize: 11, color: colors.textTertiary, flexShrink: 0 }}>
                   {cmd.description}
                 </span>
               </div>

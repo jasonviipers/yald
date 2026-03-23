@@ -10,6 +10,7 @@ import type { PipelineStage } from '@shared/types'
 const STAGE_ORDER: PipelineStage['id'][] = [
   'skill_inventory_check',
   'brainstorm',
+  'skill_forge',
   'engineer',
   'sandbox',
   'browser',
@@ -17,13 +18,13 @@ const STAGE_ORDER: PipelineStage['id'][] = [
 ]
 
 const STAGE_LABELS: Record<PipelineStage['id'], string> = {
-  skill_inventory_check: 'skill inventory',
-  brainstorm: 'brainstorm',
-  skill_forge: 'skill forge',
-  engineer: 'engineer',
-  sandbox: 'sandbox',
-  browser: 'browser',
-  qa: 'qa'
+  skill_inventory_check: 'Inventory',
+  brainstorm: 'Brainstorm',
+  skill_forge: 'Forge',
+  engineer: 'Engineer',
+  sandbox: 'Sandbox',
+  browser: 'Browser',
+  qa: 'QA'
 }
 
 export function PipelineStatus(): ReactElement | null {
@@ -40,41 +41,34 @@ export function PipelineStatus(): ReactElement | null {
       !pipelineState.error &&
       !pipelineState.sandboxUrl &&
       pipelineState.log.length === 0)
-  ) {
+  )
     return null
-  }
 
-  const activeStage =
+  const activeStageLabel =
     pipelineState.activeStage && STAGE_LABELS[pipelineState.activeStage]
       ? STAGE_LABELS[pipelineState.activeStage]
       : null
   const lastLines = pipelineState.log.slice(-5)
 
   return (
-    <div
-      data-yald-ui
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        maxHeight: 360
-      }}
-    >
+    <div data-yald-ui style={{ display: 'flex', flexDirection: 'column', maxHeight: 360 }}>
+      {/* Header */}
       <div
         style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           gap: 12,
-          padding: '16px 18px 12px',
-          borderBottom: `1px solid ${colors.containerBorder}`
+          padding: '14px 16px 11px',
+          borderBottom: `1px solid rgba(255,255,255,0.055)`
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
           <span
             style={{
-              width: 34,
-              height: 34,
-              borderRadius: 12,
+              width: 30,
+              height: 30,
+              borderRadius: 9,
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -88,44 +82,59 @@ export function PipelineStatus(): ReactElement | null {
                 transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
                 style={{ display: 'inline-flex' }}
               >
-                <SpinnerGap size={16} />
+                <SpinnerGap size={14} />
               </motion.span>
             ) : pipelineState.error ? (
-              <WarningCircle size={16} />
+              <WarningCircle size={14} />
             ) : (
-              <CheckCircle size={16} weight="fill" />
+              <CheckCircle size={14} weight="fill" />
             )}
           </span>
           <div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: colors.textPrimary }}>
+            <div
+              style={{
+                fontSize: 12.5,
+                fontWeight: 600,
+                color: colors.textPrimary,
+                letterSpacing: '-0.015em'
+              }}
+            >
               Vibe Pipeline
             </div>
-            <div style={{ fontSize: 11, color: colors.textTertiary, marginTop: 2 }}>
+            <div
+              style={{
+                fontSize: 10.5,
+                color: colors.textTertiary,
+                marginTop: 1,
+                letterSpacing: '-0.01em'
+              }}
+            >
               {pipelineState.activeStage
-                ? `running ${activeStage}`
+                ? `Running ${activeStageLabel}`
                 : pipelineState.error
-                  ? 'failed'
-                  : 'complete'}
+                  ? 'Failed'
+                  : 'Complete'}
             </div>
           </div>
         </div>
 
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-            fontSize: 10,
-            color: colors.textTertiary
-          }}
-        >
-          <span>{activeTabId.slice(0, 8)}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span
+            style={{
+              fontSize: 10,
+              color: colors.textTertiary,
+              fontFamily: 'ui-monospace, monospace',
+              opacity: 0.6
+            }}
+          >
+            {activeTabId.slice(0, 8)}
+          </span>
           {pipelineState.sandboxUrl && (
             <button
               onClick={() => void window.yald.openExternal(pipelineState.sandboxUrl!)}
               style={{
-                height: 28,
-                padding: '0 10px',
+                height: 26,
+                padding: '0 9px',
                 borderRadius: 9999,
                 border: `1px solid ${colors.accentBorder}`,
                 background: colors.accentLight,
@@ -133,75 +142,103 @@ export function PipelineStatus(): ReactElement | null {
                 cursor: 'pointer',
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: 6,
-                fontSize: 10,
-                fontWeight: 600,
-                fontFamily: 'inherit'
+                gap: 5,
+                fontSize: 10.5,
+                fontWeight: 500,
+                fontFamily: 'inherit',
+                transition: 'background 0.12s'
               }}
-              title="Open sandbox preview"
+              onMouseEnter={(e) => {
+                ;(e.currentTarget as HTMLElement).style.background = colors.accentSoft
+              }}
+              onMouseLeave={(e) => {
+                ;(e.currentTarget as HTMLElement).style.background = colors.accentLight
+              }}
             >
-              <LinkSimple size={11} />
-              live preview
+              <LinkSimple size={10} />
+              Preview
             </button>
           )}
         </div>
       </div>
 
+      {/* Body */}
       <div
         style={{
-          padding: 16,
+          padding: '12px 14px',
           overflowY: 'auto',
           display: 'flex',
           flexDirection: 'column',
-          gap: 12
+          gap: 10
         }}
       >
+        {/* Stage grid */}
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(6, minmax(0, 1fr))',
-            gap: 8
+            gridTemplateColumns: `repeat(${STAGE_ORDER.length}, minmax(0, 1fr))`,
+            gap: 6
           }}
         >
           {STAGE_ORDER.map((stageId) => {
             const stage = pipelineState.stages.find((item) => item.id === stageId)
-            const color =
-              stage?.status === 'complete'
-                ? colors.statusComplete
-                : stage?.status === 'running'
-                  ? colors.accent
-                  : stage?.status === 'failed'
-                    ? colors.statusError
-                    : colors.textTertiary
+            const isRunning = stage?.status === 'running'
+            const isComplete = stage?.status === 'complete'
+            const isFailed = stage?.status === 'failed'
+
+            const dotColor = isComplete
+              ? colors.statusComplete
+              : isRunning
+                ? colors.accent
+                : isFailed
+                  ? colors.statusError
+                  : colors.textTertiary
 
             return (
               <div
                 key={stageId}
                 style={{
-                  borderRadius: 16,
-                  border: `1px solid ${stage?.status === 'running' ? colors.accentBorderMedium : colors.containerBorder}`,
-                  background:
-                    stage?.status === 'complete'
-                      ? colors.statusCompleteBg
-                      : stage?.status === 'running'
-                        ? colors.accentLight
-                        : colors.surfacePrimary,
-                  padding: '10px 10px 8px'
+                  borderRadius: 9,
+                  border: `1px solid ${isRunning ? colors.accentBorderMedium : colors.containerBorder}`,
+                  background: isComplete
+                    ? colors.statusCompleteBg
+                    : isRunning
+                      ? colors.accentLight
+                      : colors.surfacePrimary,
+                  padding: '8px 8px 7px',
+                  transition: 'border-color 0.15s, background 0.15s'
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  {stage?.status === 'complete' ? (
-                    <CheckCircle size={12} weight="fill" style={{ color }} />
-                  ) : stage?.status === 'failed' ? (
-                    <WarningCircle size={12} weight="fill" style={{ color }} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                  {isComplete ? (
+                    <CheckCircle
+                      size={10}
+                      weight="fill"
+                      style={{ color: dotColor, flexShrink: 0 }}
+                    />
+                  ) : isFailed ? (
+                    <WarningCircle
+                      size={10}
+                      weight="fill"
+                      style={{ color: dotColor, flexShrink: 0 }}
+                    />
                   ) : (
                     <Circle
-                      size={12}
-                      weight={stage?.status === 'running' ? 'fill' : 'regular'}
-                      style={{ color }}
+                      size={10}
+                      weight={isRunning ? 'fill' : 'regular'}
+                      style={{ color: dotColor, flexShrink: 0 }}
                     />
                   )}
-                  <span style={{ fontSize: 10, color, textTransform: 'capitalize' }}>
+                  <span
+                    style={{
+                      fontSize: 9.5,
+                      color: dotColor,
+                      letterSpacing: '-0.01em',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
                     {STAGE_LABELS[stageId]}
                   </span>
                 </div>
@@ -210,43 +247,51 @@ export function PipelineStatus(): ReactElement | null {
           })}
         </div>
 
+        {/* Log */}
         <div
           style={{
-            borderRadius: 16,
+            borderRadius: 10,
             border: `1px solid ${colors.containerBorder}`,
             background: colors.surfacePrimary,
-            padding: '12px 14px'
+            padding: '10px 12px'
           }}
         >
           <div
-            style={{ fontSize: 11, fontWeight: 600, color: colors.textPrimary, marginBottom: 8 }}
+            style={{
+              fontSize: 10,
+              fontWeight: 600,
+              color: colors.textTertiary,
+              marginBottom: 6,
+              letterSpacing: '0.04em',
+              textTransform: 'uppercase'
+            }}
           >
-            Recent log
+            Log
           </div>
           <pre
             style={{
               margin: 0,
-              borderRadius: 12,
+              borderRadius: 8,
               background: colors.codeBg,
               color: colors.textSecondary,
-              padding: '10px 12px',
-              fontSize: 11,
+              padding: '9px 11px',
+              fontSize: 10.5,
               lineHeight: 1.55,
               fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
               whiteSpace: 'pre-wrap',
               wordBreak: 'break-word'
             }}
           >
-            {lastLines.length > 0 ? lastLines.join('\n') : '[pipeline] waiting'}
+            {lastLines.length > 0 ? lastLines.join('\n') : '[pipeline] waiting…'}
           </pre>
         </div>
 
+        {/* Error */}
         {pipelineState.error && (
           <div
             style={{
-              marginTop: -2,
-              borderRadius: 12,
-              padding: '10px 12px',
+              borderRadius: 9,
+              padding: '9px 11px',
               background: colors.statusErrorBg,
               color: colors.statusError,
               fontSize: 11,
@@ -257,19 +302,27 @@ export function PipelineStatus(): ReactElement | null {
           </div>
         )}
 
+        {/* Delivery summary */}
         {pipelineState.deliverySummary && (
           <div
             style={{
-              borderRadius: 16,
+              borderRadius: 10,
               border: `1px solid ${colors.containerBorder}`,
               background: colors.surfacePrimary,
-              padding: '14px 14px 12px'
+              padding: '12px 13px'
             }}
           >
             <div
-              style={{ fontSize: 11, fontWeight: 600, color: colors.textPrimary, marginBottom: 10 }}
+              style={{
+                fontSize: 10,
+                fontWeight: 600,
+                color: colors.textTertiary,
+                marginBottom: 8,
+                letterSpacing: '0.04em',
+                textTransform: 'uppercase'
+              }}
             >
-              Delivery summary
+              Summary
             </div>
             <div
               className="prose prose-sm max-w-none"
