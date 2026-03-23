@@ -221,7 +221,7 @@ function createWindow(): void {
     // { forward: true } ensures mousemove events still reach the renderer
     // so it can toggle click-through off when cursor enters interactive UI.
     mainWindow?.setIgnoreMouseEvents(true, { forward: true })
-    if (process.env.ELECTRON_RENDERER_URL) {
+    if (process.env.ELECTRON_RENDERER_URL && DEBUG_MODE) {
       mainWindow?.webContents.openDevTools({ mode: 'detach' })
     }
   })

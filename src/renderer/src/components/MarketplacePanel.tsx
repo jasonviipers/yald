@@ -40,9 +40,7 @@ export function MarketplacePanel() {
       await installSkill()
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
-      if (!message.toLowerCase().includes('cancelled')) {
-        setError(message || 'Skill installation failed')
-      }
+      if (!message.toLowerCase().includes('cancelled')) setError(message || 'Installation failed')
     } finally {
       setPendingInstall(false)
     }
@@ -54,8 +52,7 @@ export function MarketplacePanel() {
     try {
       await uninstallSkill(skillId)
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err)
-      setError(message || 'Skill removal failed')
+      setError(err instanceof Error ? err.message : String(err) || 'Removal failed')
     } finally {
       setBusySkillId(null)
     }
@@ -66,30 +63,29 @@ export function MarketplacePanel() {
     try {
       await refreshInstalledSkills()
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err)
-      setError(message || 'Refresh failed')
+      setError(err instanceof Error ? err.message : String(err) || 'Refresh failed')
     }
   }
 
   return (
     <div data-yald-ui style={{ display: 'flex', flexDirection: 'column', maxHeight: 360 }}>
-      {/* ── Header ── */}
+      {/* Header */}
       <div
         style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           gap: 12,
-          padding: '16px 18px 12px',
-          borderBottom: `1px solid ${colors.containerBorder}`
+          padding: '14px 16px 11px',
+          borderBottom: `1px solid rgba(255,255,255,0.055)`
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
           <span
             style={{
-              width: 34,
-              height: 34,
-              borderRadius: 12,
+              width: 30,
+              height: 30,
+              borderRadius: 9,
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -97,25 +93,39 @@ export function MarketplacePanel() {
               color: colors.accent
             }}
           >
-            <Sparkle size={16} />
+            <Sparkle size={14} />
           </span>
           <div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: colors.textPrimary }}>
+            <div
+              style={{
+                fontSize: 12.5,
+                fontWeight: 600,
+                color: colors.textPrimary,
+                letterSpacing: '-0.015em'
+              }}
+            >
               Prompt Skills
             </div>
-            <div style={{ fontSize: 11, color: colors.textTertiary, marginTop: 2 }}>
-              {enabledCount} enabled of {installedSkills.length} installed
+            <div
+              style={{
+                fontSize: 10.5,
+                color: colors.textTertiary,
+                marginTop: 1,
+                letterSpacing: '-0.01em'
+              }}
+            >
+              {enabledCount} enabled · {installedSkills.length} installed
             </div>
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <button
             onClick={handleInstall}
             disabled={pendingInstall}
             style={{
-              height: 34,
-              padding: '0 12px',
+              height: 28,
+              padding: '0 10px',
               borderRadius: 9999,
               border: `1px solid ${colors.accentBorder}`,
               background: colors.accentLight,
@@ -123,56 +133,40 @@ export function MarketplacePanel() {
               cursor: pendingInstall ? 'wait' : 'pointer',
               display: 'inline-flex',
               alignItems: 'center',
-              gap: 6,
+              gap: 5,
               fontSize: 11,
-              fontWeight: 600,
-              fontFamily: 'inherit'
+              fontWeight: 500,
+              fontFamily: 'inherit',
+              transition: 'background 0.12s'
+            }}
+            onMouseEnter={(e) => {
+              if (!pendingInstall)
+                (e.currentTarget as HTMLElement).style.background = colors.accentSoft
+            }}
+            onMouseLeave={(e) => {
+              ;(e.currentTarget as HTMLElement).style.background = colors.accentLight
             }}
           >
-            <Plus size={12} />
-            {pendingInstall ? 'Installing...' : 'Install skill'}
+            <Plus size={11} />
+            {pendingInstall ? 'Installing…' : 'Install'}
           </button>
-          <button
-            onClick={handleRefresh}
-            style={{
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              color: colors.textTertiary,
-              padding: 4,
-              display: 'flex'
-            }}
-            title="Refresh skills"
-            onMouseEnter={(e) => (e.currentTarget.style.color = colors.textPrimary)}
-            onMouseLeave={(e) => (e.currentTarget.style.color = colors.textTertiary)}
-          >
-            <ArrowClockwise size={14} />
-          </button>
-          <button
-            onClick={closeSkillsPanel}
-            style={{
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              color: colors.textTertiary,
-              padding: 4,
-              display: 'flex'
-            }}
-            onMouseEnter={(e) => (e.currentTarget.style.color = colors.textPrimary)}
-            onMouseLeave={(e) => (e.currentTarget.style.color = colors.textTertiary)}
-          >
-            <X size={14} />
-          </button>
+
+          <PanelIconBtn onClick={handleRefresh} title="Refresh">
+            <ArrowClockwise size={13} />
+          </PanelIconBtn>
+          <PanelIconBtn onClick={closeSkillsPanel} title="Close">
+            <X size={13} />
+          </PanelIconBtn>
         </div>
       </div>
 
-      {/* ── Error banner ── */}
+      {/* Error */}
       {error && (
         <div
           style={{
-            margin: '12px 16px 0',
-            borderRadius: 12,
-            padding: '10px 12px',
+            margin: '10px 14px 0',
+            borderRadius: 9,
+            padding: '8px 11px',
             background: colors.statusErrorBg,
             color: colors.statusError,
             fontSize: 11,
@@ -183,35 +177,42 @@ export function MarketplacePanel() {
         </div>
       )}
 
-      {/* ── Body ── */}
+      {/* Body */}
       <div
         style={{
-          padding: 16,
+          padding: '12px 14px',
           overflowY: 'auto',
           display: 'flex',
           flexDirection: 'column',
-          gap: 10
+          gap: 8
         }}
       >
         {installedSkills.length === 0 ? (
           <div
             style={{
-              borderRadius: 16,
+              borderRadius: 12,
               border: `1px dashed ${colors.containerBorder}`,
-              padding: '20px 18px',
+              padding: '18px 16px',
               background: colors.surfacePrimary
             }}
           >
-            <div style={{ fontSize: 13, fontWeight: 600, color: colors.textPrimary }}>
-              No prompt skills installed
+            <div
+              style={{
+                fontSize: 12.5,
+                fontWeight: 500,
+                color: colors.textPrimary,
+                letterSpacing: '-0.015em'
+              }}
+            >
+              No skills installed
             </div>
             <div
-              style={{ fontSize: 11, color: colors.textTertiary, marginTop: 6, lineHeight: 1.55 }}
+              style={{ fontSize: 11, color: colors.textTertiary, marginTop: 5, lineHeight: 1.55 }}
             >
               Install a local{' '}
               <code
                 style={{
-                  fontFamily: 'monospace',
+                  fontFamily: 'ui-monospace, monospace',
                   background: colors.codeBg,
                   padding: '1px 4px',
                   borderRadius: 3
@@ -219,28 +220,62 @@ export function MarketplacePanel() {
               >
                 SKILL.md
               </code>{' '}
-              file and yald will append it as guidance to future Ollama runs.
+              file to append guidance to future runs.
             </div>
           </div>
         ) : (
-          installedSkills.map((skill) => {
-            const enabled = selectedSkillIds.includes(skill.id)
-            const busy = busySkillId === skill.id
-            return (
-              <SkillCard
-                key={skill.id}
-                skill={skill}
-                enabled={enabled}
-                busy={busy}
-                colors={colors}
-                onToggle={() => toggleSkillSelection(skill.id)}
-                onUninstall={() => void handleUninstall(skill.id)}
-              />
-            )
-          })
+          installedSkills.map((skill) => (
+            <SkillCard
+              key={skill.id}
+              skill={skill}
+              enabled={selectedSkillIds.includes(skill.id)}
+              busy={busySkillId === skill.id}
+              colors={colors}
+              onToggle={() => toggleSkillSelection(skill.id)}
+              onUninstall={() => void handleUninstall(skill.id)}
+            />
+          ))
         )}
       </div>
     </div>
+  )
+}
+
+function PanelIconBtn({
+  children,
+  title,
+  onClick
+}: {
+  children: React.ReactNode
+  title: string
+  onClick: () => void
+}) {
+  const colors = useColors()
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      style={{
+        background: 'none',
+        border: 'none',
+        cursor: 'pointer',
+        color: colors.textTertiary,
+        padding: 4,
+        display: 'flex',
+        borderRadius: 6,
+        transition: 'color 0.12s, background 0.12s'
+      }}
+      onMouseEnter={(e) => {
+        ;(e.currentTarget as HTMLElement).style.color = colors.textPrimary
+        ;(e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.05)'
+      }}
+      onMouseLeave={(e) => {
+        ;(e.currentTarget as HTMLElement).style.color = colors.textTertiary
+        ;(e.currentTarget as HTMLElement).style.background = 'none'
+      }}
+    >
+      {children}
+    </button>
   )
 }
 
@@ -264,19 +299,20 @@ function SkillCard({
   return (
     <div
       style={{
-        borderRadius: 16,
+        borderRadius: 12,
         border: `1px solid ${enabled ? colors.accentBorderMedium : colors.containerBorder}`,
         background: enabled ? colors.surfaceActive : colors.surfacePrimary,
-        padding: '14px 14px 12px'
+        padding: '12px 13px 10px',
+        transition: 'border-color 0.15s, background 0.15s'
       }}
     >
-      {/* ── Top row: toggle + content + remove ── */}
+      {/* Top: toggle + content + remove */}
       <div
         style={{
           display: 'flex',
           alignItems: 'flex-start',
           justifyContent: 'space-between',
-          gap: 12
+          gap: 10
         }}
       >
         <button
@@ -288,22 +324,22 @@ function SkillCard({
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'flex-start',
-            gap: 10,
+            gap: 9,
             textAlign: 'left',
             flex: 1
           }}
         >
           <span style={{ color: enabled ? colors.accent : colors.textTertiary, marginTop: 1 }}>
-            {enabled ? <CheckCircle size={16} weight="fill" /> : <Circle size={16} />}
+            {enabled ? <CheckCircle size={15} weight="fill" /> : <Circle size={15} />}
           </span>
           <span style={{ minWidth: 0 }}>
             <span
               style={{
                 display: 'block',
-                fontSize: 13,
-                fontWeight: 600,
+                fontSize: 12.5,
+                fontWeight: 500,
                 color: colors.textPrimary,
-                letterSpacing: '-0.01em'
+                letterSpacing: '-0.015em'
               }}
             >
               {skill.name}
@@ -313,8 +349,9 @@ function SkillCard({
                 display: 'block',
                 fontSize: 11,
                 color: colors.textTertiary,
-                marginTop: 5,
-                lineHeight: 1.55
+                marginTop: 4,
+                lineHeight: 1.5,
+                letterSpacing: '-0.01em'
               }}
             >
               {skill.description}
@@ -326,30 +363,30 @@ function SkillCard({
           onClick={onUninstall}
           disabled={busy}
           style={{
-            borderRadius: 9999,
+            borderRadius: 7,
             border: `1px solid ${colors.containerBorder}`,
             background: 'transparent',
             color: colors.textTertiary,
             cursor: busy ? 'wait' : 'pointer',
             display: 'inline-flex',
             alignItems: 'center',
-            gap: 6,
-            fontSize: 10,
-            fontWeight: 600,
-            padding: '6px 10px',
+            gap: 5,
+            fontSize: 10.5,
+            fontWeight: 500,
+            padding: '5px 9px',
             fontFamily: 'inherit',
             whiteSpace: 'nowrap',
-            transition: 'all 0.15s'
+            transition: 'all 0.12s'
           }}
           onMouseEnter={(e) => {
             if (!busy) {
-              e.currentTarget.style.color = colors.statusError
-              e.currentTarget.style.borderColor = colors.statusError
+              ;(e.currentTarget as HTMLElement).style.color = colors.statusError
+              ;(e.currentTarget as HTMLElement).style.borderColor = colors.statusError
             }
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.color = colors.textTertiary
-            e.currentTarget.style.borderColor = colors.containerBorder
+            ;(e.currentTarget as HTMLElement).style.color = colors.textTertiary
+            ;(e.currentTarget as HTMLElement).style.borderColor = colors.containerBorder
           }}
           title="Remove skill"
         >
@@ -359,41 +396,48 @@ function SkillCard({
               transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
               style={{ display: 'flex' }}
             >
-              <SpinnerGap size={11} />
+              <SpinnerGap size={10} />
             </motion.div>
           ) : (
-            <Trash size={11} />
+            <Trash size={10} />
           )}
-          {busy ? 'Removing...' : 'Remove'}
+          {busy ? 'Removing…' : 'Remove'}
         </button>
       </div>
 
-      {/* ── Bottom row: status label + enable/disable pill ── */}
+      {/* Bottom: status */}
       <div
         style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           gap: 10,
-          marginTop: 12,
-          paddingLeft: 26
+          marginTop: 10,
+          paddingLeft: 24
         }}
       >
-        <span style={{ fontSize: 10, color: enabled ? colors.accent : colors.textTertiary }}>
-          {enabled ? 'Enabled for the next Ollama run' : 'Installed but disabled'}
+        <span
+          style={{
+            fontSize: 10,
+            color: enabled ? colors.accent : colors.textTertiary,
+            letterSpacing: '-0.01em'
+          }}
+        >
+          {enabled ? 'Active on next run' : 'Installed, disabled'}
         </span>
         <button
           onClick={onToggle}
           style={{
-            borderRadius: 9999,
+            borderRadius: 7,
             border: `1px solid ${enabled ? colors.accentBorder : colors.containerBorder}`,
             background: enabled ? colors.accentLight : 'transparent',
             color: enabled ? colors.accent : colors.textSecondary,
             cursor: 'pointer',
-            fontSize: 10,
-            fontWeight: 600,
-            padding: '5px 10px',
-            fontFamily: 'inherit'
+            fontSize: 10.5,
+            fontWeight: 500,
+            padding: '4px 9px',
+            fontFamily: 'inherit',
+            transition: 'all 0.12s'
           }}
         >
           {enabled ? 'Disable' : 'Enable'}

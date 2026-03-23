@@ -5,16 +5,16 @@ import { useColors } from '../lib/theme'
 import type { Attachment } from '@shared/types'
 
 const FILE_ICONS: Record<string, React.ReactNode> = {
-  'image/png': <Image size={12} />,
-  'image/jpeg': <Image size={12} />,
-  'image/gif': <Image size={12} />,
-  'image/webp': <Image size={12} />,
-  'image/svg+xml': <Image size={12} />,
-  'text/plain': <FileText size={12} />,
-  'text/markdown': <FileText size={12} />,
-  'application/json': <FileCode size={12} />,
-  'text/yaml': <FileCode size={12} />,
-  'text/toml': <FileCode size={12} />
+  'image/png': <Image size={11} />,
+  'image/jpeg': <Image size={11} />,
+  'image/gif': <Image size={11} />,
+  'image/webp': <Image size={11} />,
+  'image/svg+xml': <Image size={11} />,
+  'text/plain': <FileText size={11} />,
+  'text/markdown': <FileText size={11} />,
+  'application/json': <FileCode size={11} />,
+  'text/yaml': <FileCode size={11} />,
+  'text/toml': <FileCode size={11} />
 }
 
 export function AttachmentChips({
@@ -34,45 +34,54 @@ export function AttachmentChips({
           <motion.div
             key={a.id}
             layout
-            initial={{ opacity: 0, scale: 0.82, x: -6 }}
+            initial={{ opacity: 0, scale: 0.8, x: -4 }}
             animate={{ opacity: 1, scale: 1, x: 0 }}
-            exit={{ opacity: 0, scale: 0.82 }}
-            transition={{ duration: 0.14, ease: [0.34, 1.2, 0.64, 1] }}
+            exit={{ opacity: 0, scale: 0.8 }}
+            transition={{ duration: 0.13, ease: [0.22, 1, 0.36, 1] }}
             className="flex items-center gap-1.5 group flex-shrink-0"
             style={{
-              background: 'rgba(255,255,255,0.07)',
-              border: '1px solid rgba(255,255,255,0.1)',
-              boxShadow: '0 1px 0 rgba(255,255,255,0.1) inset',
-              borderRadius: 10,
-              padding: a.dataUrl ? '3px 8px 3px 3px' : '4px 8px 4px 6px',
-              maxWidth: 200,
-              backdropFilter: 'blur(12px)'
+              background: 'rgba(255,255,255,0.055)',
+              border: '1px solid rgba(255,255,255,0.09)',
+              boxShadow: '0 1px 0 rgba(255,255,255,0.08) inset',
+              borderRadius: 8,
+              padding: a.dataUrl ? '2px 7px 2px 2px' : '3px 7px 3px 6px',
+              maxWidth: 190,
+              backdropFilter: 'blur(10px)'
             }}
           >
             {a.dataUrl ? (
               <img
                 src={a.dataUrl}
                 alt={a.name}
-                className="rounded-[7px] object-cover flex-shrink-0"
-                style={{ width: 22, height: 22 }}
+                className="rounded-[6px] object-cover flex-shrink-0"
+                style={{ width: 20, height: 20 }}
               />
             ) : (
               <span className="flex-shrink-0" style={{ color: colors.textTertiary }}>
-                {FILE_ICONS[a.mimeType || ''] || <File size={12} />}
+                {FILE_ICONS[a.mimeType || ''] || <File size={11} />}
               </span>
             )}
+
             <span
-              className="text-[11px] font-medium truncate min-w-0 flex-1"
-              style={{ color: colors.textPrimary, letterSpacing: '-0.01em' }}
+              className="text-[10.5px] truncate min-w-0 flex-1"
+              style={{ color: colors.textSecondary, letterSpacing: '-0.01em', fontWeight: 400 }}
             >
               {a.name}
             </span>
+
             <button
               onClick={() => onRemove(a.id)}
-              className="flex-shrink-0 w-[14px] h-[14px] rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-              style={{ color: colors.textTertiary, background: 'rgba(255,255,255,0.1)' }}
+              className="flex-shrink-0 flex items-center justify-center rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+              style={{
+                width: 13,
+                height: 13,
+                color: colors.textTertiary,
+                background: 'rgba(255,255,255,0.09)',
+                border: 'none',
+                cursor: 'pointer'
+              }}
             >
-              <X size={8} weight="bold" />
+              <X size={7} weight="bold" />
             </button>
           </motion.div>
         ))}

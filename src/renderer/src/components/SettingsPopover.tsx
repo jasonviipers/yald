@@ -1,4 +1,3 @@
-// ─── SettingsPopover.tsx ─────────────────────────────────────────────────────
 import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { motion } from 'framer-motion'
@@ -7,6 +6,8 @@ import { useThemeStore } from '../lib/theme'
 import { useSessionStore } from '../stores/sessionStore'
 import { usePopoverLayer } from './PopoverLayer'
 import { useColors } from '../lib/theme'
+
+// ─── Toggle ──────────────────────────────────────────────────────────────────
 
 function Toggle({
   checked,
@@ -26,12 +27,12 @@ function Toggle({
       onClick={() => onChange(!checked)}
       style={{
         position: 'relative',
-        width: 32,
-        height: 18,
+        width: 30,
+        height: 17,
         borderRadius: 9999,
-        background: checked ? colors.accent : 'rgba(255,255,255,0.1)',
-        border: `1px solid ${checked ? colors.accent : 'rgba(255,255,255,0.12)'}`,
-        transition: 'background 0.2s, border-color 0.2s',
+        background: checked ? colors.accent : 'rgba(255,255,255,0.08)',
+        border: `1px solid ${checked ? colors.accent : 'rgba(255,255,255,0.1)'}`,
+        transition: 'background 0.18s, border-color 0.18s',
         cursor: 'pointer',
         flexShrink: 0
       }}
@@ -41,18 +42,20 @@ function Toggle({
           position: 'absolute',
           top: '50%',
           transform: 'translateY(-50%)',
-          left: checked ? 15 : 2,
-          width: 13,
-          height: 13,
+          left: checked ? 14 : 2,
+          width: 12,
+          height: 12,
           borderRadius: '50%',
           background: '#fff',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.35)',
-          transition: 'left 0.18s cubic-bezier(0.34,1.2,0.64,1)'
+          boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+          transition: 'left 0.16s cubic-bezier(0.22, 1, 0.36, 1)'
         }}
       />
     </button>
   )
 }
+
+// ─── SettingRow ───────────────────────────────────────────────────────────────
 
 function SettingRow({
   icon,
@@ -68,16 +71,21 @@ function SettingRow({
   const colors = useColors()
   return (
     <div
-      className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg transition-all"
-      style={{ cursor: 'default' }}
+      className="flex items-center justify-between gap-3"
+      style={{
+        padding: '6px 10px',
+        borderRadius: 8,
+        cursor: 'default',
+        transition: 'background 0.1s'
+      }}
       onMouseEnter={(e) =>
-        ((e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.04)')
+        ((e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.035)')
       }
       onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = 'transparent')}
     >
       <div className="flex items-center gap-2">
-        <span style={{ color: colors.textTertiary }}>{icon}</span>
-        <span style={{ fontSize: 12, color: colors.textPrimary, letterSpacing: '-0.01em' }}>
+        <span style={{ color: colors.textTertiary, display: 'flex' }}>{icon}</span>
+        <span style={{ fontSize: 12, color: colors.textPrimary, letterSpacing: '-0.012em' }}>
           {label}
         </span>
       </div>
@@ -85,6 +93,8 @@ function SettingRow({
     </div>
   )
 }
+
+// ─── SettingInput ─────────────────────────────────────────────────────────────
 
 function SettingInput({
   label,
@@ -102,17 +112,21 @@ function SettingInput({
   help?: string
 }) {
   const colors = useColors()
-
   return (
     <label
-      className="flex flex-col gap-1 px-3 py-2 rounded-lg transition-all"
-      style={{ cursor: 'default' }}
+      className="flex flex-col gap-1.5"
+      style={{
+        padding: '6px 10px',
+        borderRadius: 8,
+        cursor: 'default',
+        transition: 'background 0.1s'
+      }}
       onMouseEnter={(e) =>
-        ((e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.04)')
+        ((e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.025)')
       }
       onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = 'transparent')}
     >
-      <span style={{ fontSize: 12, color: colors.textPrimary, letterSpacing: '-0.01em' }}>
+      <span style={{ fontSize: 11.5, color: colors.textSecondary, letterSpacing: '-0.012em' }}>
         {label}
       </span>
       <input
@@ -125,22 +139,50 @@ function SettingInput({
         autoCorrect="off"
         style={{
           width: '100%',
-          height: 32,
-          borderRadius: 10,
+          height: 30,
+          borderRadius: 8,
           border: `1px solid ${colors.popoverBorder}`,
-          background: 'rgba(255,255,255,0.06)',
+          background: 'rgba(255,255,255,0.045)',
           color: colors.textPrimary,
-          padding: '0 10px',
-          fontSize: 12,
-          outline: 'none'
+          padding: '0 9px',
+          fontSize: 11.5,
+          outline: 'none',
+          transition: 'border-color 0.12s'
+        }}
+        onFocus={(e) => {
+          e.currentTarget.style.borderColor = colors.inputFocusBorder
+        }}
+        onBlur={(e) => {
+          e.currentTarget.style.borderColor = colors.popoverBorder
         }}
       />
       {help && (
-        <span style={{ fontSize: 11, color: colors.textTertiary, lineHeight: 1.35 }}>{help}</span>
+        <span style={{ fontSize: 10.5, color: colors.textTertiary, lineHeight: 1.4 }}>{help}</span>
       )}
     </label>
   )
 }
+
+// ─── SectionLabel ─────────────────────────────────────────────────────────────
+
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  const colors = useColors()
+  return (
+    <div
+      style={{
+        fontSize: 10,
+        color: colors.textTertiary,
+        padding: '10px 10px 4px',
+        letterSpacing: '0.07em',
+        textTransform: 'uppercase'
+      }}
+    >
+      {children}
+    </div>
+  )
+}
+
+// ─── SettingsPopover ──────────────────────────────────────────────────────────
 
 export function SettingsPopover() {
   const soundEnabled = useThemeStore((s) => s.soundEnabled)
@@ -203,11 +245,19 @@ export function SettingsPopover() {
           if (!open) updatePos()
           toggleSettingsOpen()
         }}
-        className="flex-shrink-0 w-[26px] h-[26px] flex items-center justify-center rounded-full transition-all"
-        style={{ color: colors.textTertiary }}
+        className="flex-shrink-0 flex items-center justify-center rounded-full"
+        style={{
+          width: 24,
+          height: 24,
+          color: colors.textTertiary,
+          background: 'transparent',
+          border: 'none',
+          cursor: 'pointer',
+          transition: 'background 0.12s, color 0.12s'
+        }}
         title="Settings"
         onMouseEnter={(e) => {
-          ;(e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.08)'
+          ;(e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.07)'
           ;(e.currentTarget as HTMLElement).style.color = colors.textSecondary
         }}
         onMouseLeave={(e) => {
@@ -215,7 +265,7 @@ export function SettingsPopover() {
           ;(e.currentTarget as HTMLElement).style.color = colors.textTertiary
         }}
       >
-        <DotsThree size={15} weight="bold" />
+        <DotsThree size={14} weight="bold" />
       </button>
 
       {popoverLayer &&
@@ -224,87 +274,69 @@ export function SettingsPopover() {
           <motion.div
             ref={popoverRef}
             data-yald-ui
-            initial={{ opacity: 0, y: isExpanded ? -6 : 6, scale: 0.96 }}
+            initial={{ opacity: 0, y: isExpanded ? -5 : 5, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: isExpanded ? -4 : 4, scale: 0.96 }}
-            transition={{ duration: 0.16, ease: [0.34, 1.2, 0.64, 1] }}
+            transition={{ duration: 0.15, ease: [0.22, 1, 0.36, 1] }}
             style={{
               position: 'fixed',
               ...(pos.top != null ? { top: pos.top } : {}),
               ...(pos.bottom != null ? { bottom: pos.bottom } : {}),
               right: pos.right,
-              width: 320,
+              width: 300,
               maxHeight: 420,
               pointerEvents: 'auto',
-              borderRadius: 16,
+              borderRadius: 14,
               overflow: 'hidden',
               background: colors.popoverBg,
-              backdropFilter: 'blur(40px) saturate(200%)',
-              WebkitBackdropFilter: 'blur(40px) saturate(200%)',
-              boxShadow: `${colors.popoverShadow}, 0 1px 0 rgba(255,255,255,0.12) inset`,
+              backdropFilter: 'blur(44px) saturate(200%)',
+              WebkitBackdropFilter: 'blur(44px) saturate(200%)',
+              boxShadow: `${colors.popoverShadow}, 0 1px 0 rgba(255,255,255,0.1) inset`,
               border: `1px solid ${colors.popoverBorder}`
             }}
           >
             <div style={{ padding: '6px 4px', overflowY: 'auto', maxHeight: 420 }}>
-              <div
-                style={{
-                  fontSize: 10,
-                  color: colors.textTertiary,
-                  padding: '4px 12px 6px',
-                  letterSpacing: '0.06em',
-                  textTransform: 'uppercase'
-                }}
-              >
-                Preferences
-              </div>
+              <SectionLabel>Display</SectionLabel>
               <SettingRow
-                icon={<ArrowsOutSimple size={13} />}
+                icon={<ArrowsOutSimple size={12} />}
                 label="Full width"
                 checked={expandedUI}
                 onChange={setExpandedUI}
               />
               <SettingRow
-                icon={<Bell size={13} />}
-                label="Notification sound"
-                checked={soundEnabled}
-                onChange={setSoundEnabled}
-              />
-              <SettingRow
-                icon={<Moon size={13} />}
+                icon={<Moon size={12} />}
                 label="Dark mode"
                 checked={themeMode === 'dark'}
                 onChange={(v) => setThemeMode(v ? 'dark' : 'light')}
               />
+              <SettingRow
+                icon={<Bell size={12} />}
+                label="Notification sound"
+                checked={soundEnabled}
+                onChange={setSoundEnabled}
+              />
 
               <div
-                style={{
-                  fontSize: 10,
-                  color: colors.textTertiary,
-                  padding: '10px 12px 6px',
-                  letterSpacing: '0.06em',
-                  textTransform: 'uppercase'
-                }}
-              >
-                Voice And Providers
-              </div>
+                style={{ height: 1, background: 'rgba(255,255,255,0.05)', margin: '6px 10px' }}
+              />
 
+              <SectionLabel>Voice & Providers</SectionLabel>
               <SettingInput
                 label="Ollama API key"
                 type="password"
                 value={ollamaApiKey}
                 onChange={(value) => setOllamaConfig({ ...ollamaConfig, apiKey: value })}
-                placeholder="Optional if the backend already has one"
+                placeholder="Optional if backend has one"
               />
-
               <SettingInput
                 label="Backend URL"
                 value={ollamaBaseUrl}
                 onChange={(value) => setOllamaConfig({ ...ollamaConfig, baseUrl: value })}
                 placeholder="http://127.0.0.1:8787"
-                help="Electron now targets the Bun backend by default. Leave this empty for the local backend, or set it to another backend URL."
+                help="Leave empty for local backend."
               />
 
-              <div style={{ padding: '6px 12px 2px' }}>
+              <div style={{ padding: '8px 10px 4px' }}>
                 <button
                   type="button"
                   onClick={() => {
@@ -313,22 +345,29 @@ export function SettingsPopover() {
                   }}
                   style={{
                     width: '100%',
-                    height: 34,
-                    borderRadius: 10,
+                    height: 32,
+                    borderRadius: 8,
                     border: `1px solid ${colors.popoverBorder}`,
-                    background: 'rgba(255,255,255,0.06)',
-                    color: colors.textPrimary,
+                    background: 'rgba(255,255,255,0.04)',
+                    color: colors.textSecondary,
                     display: 'inline-flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    gap: 8,
+                    gap: 7,
                     cursor: 'pointer',
                     fontSize: 12,
-                    fontFamily: 'inherit'
+                    fontFamily: 'inherit',
+                    transition: 'background 0.12s'
+                  }}
+                  onMouseEnter={(e) => {
+                    ;(e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.07)'
+                  }}
+                  onMouseLeave={(e) => {
+                    ;(e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.04)'
                   }}
                 >
-                  <HeadCircuit size={13} />
-                  Open Prompt Skills
+                  <HeadCircuit size={12} />
+                  Prompt Skills
                 </button>
               </div>
             </div>
