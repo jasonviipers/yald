@@ -122,6 +122,73 @@ interface ChatPayload {
   }
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function asString(value: unknown, fallback = ''): string {
+  return typeof value === 'string' ? value : fallback
+}
+
+function asNumber(value: unknown, fallback = 0): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : fallback
+}
+
+function asStringArray(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === 'string')
+    : []
+}
+
+function parseJsonPayload(content: string): unknown {
+  const trimmed = content.trim()
+  const fencedMatch = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i)
+  return JSON.parse(fencedMatch ? fencedMatch[1] : trimmed)
+}
+
+function normalizeBrainstormBrief(value: unknown): BrainstormBrief {
+  if (!isRecord(value)) {
+    throw new Error('Brainstorm response was not a JSON object')
+  }
+
+  const stack = isRecord(value.stack) ? value.stack : {}
+  const rawDataModel = Array.isArray(value.data_model) ? value.data_model : []
+
+  return {
+    problem: asString(value.problem),
+    mvp_features: asStringArray(value.mvp_features),
+    out_of_scope: asStringArray(value.out_of_scope),
+    stack: {
+      frontend: asString(stack.frontend) || asString(stack.fontend),
+      backend: asString(stack.backend),
+      db: asString(stack.db),
+      rationale: asString(stack.rationale)
+    },
+    data_model: rawDataModel
+      .filter((item): item is Record<string, unknown> => isRecord(item))
+      .map((item) => ({
+        entity: asString(item.entity),
+        fields: asStringArray(item.fields),
+        relations: asStringArray(item.relations)
+      })),
+    ux_flow: asStringArray(value.ux_flow),
+    file_architecture: asStringArray(value.file_architecture),
+    risks: asStringArray(value.risks),
+    confidence: asNumber(value.confidence)
+  }
+}
+
+function isUsableBrainstormBrief(brief: BrainstormBrief): boolean {
+  return Boolean(
+    brief.problem.trim() &&
+    brief.stack.frontend.trim() &&
+    brief.stack.backend.trim() &&
+    brief.stack.db.trim() &&
+    brief.mvp_features.length > 0 &&
+    brief.ux_flow.length > 0
+  )
+}
+
 const PIPELINE_STAGE_LABELS: Record<StageId, string> = {
   skill_inventory_check: 'Skill Inventory',
   brainstorm: 'Brainstorm',
@@ -433,9 +500,9 @@ export class VibePipelineManager extends EventEmitter {
 
   private resolveSkillGaps(initialGaps: string[], brief: BrainstormBrief): string[] {
     const stackTokens = [
-      brief.stack.frontend,
-      brief.stack.backend,
-      brief.stack.db,
+      brief.stack.frontend || '',
+      brief.stack.backend || '',
+      brief.stack.db || '',
       ...brief.mvp_features
     ]
       .join(' ')
@@ -505,7 +572,11 @@ export class VibePipelineManager extends EventEmitter {
 
     const content = await requestChat(provider, systemPrompt, prompt, schema, signal)
     try {
-      return JSON.parse(content) as BrainstormBrief
+      const brief = normalizeBrainstormBrief(parseJsonPayload(content))
+      if (!isUsableBrainstormBrief(brief)) {
+        throw new Error('Brainstorm response was missing required brief fields')
+      }
+      return brief
     } catch {
       const retry = await requestChat(
         provider,
@@ -514,7 +585,11 @@ export class VibePipelineManager extends EventEmitter {
         schema,
         signal
       )
-      return JSON.parse(retry) as BrainstormBrief
+      const brief = normalizeBrainstormBrief(parseJsonPayload(retry))
+      if (!isUsableBrainstormBrief(brief)) {
+        throw new Error('Brainstorm response was missing required brief fields after retry')
+      }
+      return brief
     }
   }
 
@@ -546,7 +621,7 @@ export class VibePipelineManager extends EventEmitter {
       schema,
       signal
     )
-    return JSON.parse(content) as SkillForgeResult
+    return parseJsonPayload(content) as SkillForgeResult
   }
 
   private async writeSkillToHome(skill: SkillForgeResult): Promise<string> {
@@ -625,7 +700,7 @@ export class VibePipelineManager extends EventEmitter {
       schema,
       signal
     )
-    return JSON.parse(content) as EngineerManifest
+    return parseJsonPayload(content) as EngineerManifest
   }
 
   private async applyEngineerManifest(
@@ -710,7 +785,7 @@ export class VibePipelineManager extends EventEmitter {
       JSON.stringify({ buildError, manifest }, null, 2),
       schema
     )
-    return JSON.parse(content) as Pick<EngineerManifest, 'files'>
+    return parseJsonPayload(content) as Pick<EngineerManifest, 'files'>
   }
 
   private async runBrowserReview(
@@ -808,7 +883,7 @@ export class VibePipelineManager extends EventEmitter {
       schema,
       signal
     )
-    return JSON.parse(content) as SelectorPlan
+    return parseJsonPayload(content) as SelectorPlan
   }
 
   private async runBrowserEdgeCases(
@@ -923,6 +998,6 @@ export class VibePipelineManager extends EventEmitter {
       schema,
       signal
     )
-    return JSON.parse(content) as QAResult
+    return parseJsonPayload(content) as QAResult
   }
 }
